@@ -5,7 +5,7 @@ public class Player {
     private String name;
     private int position;
     private Color color;
-    private Stack<Integer> stepHistory; // Fitur Stack untuk riwayat
+    private Stack<Integer> stepHistory;
 
     public Player(String name, Color color) {
         this.name = name;
@@ -27,9 +27,11 @@ public class Player {
         return color;
     }
 
+    // --- METHOD YANG SEBELUMNYA HILANG ---
     public Stack<Integer> getHistory() {
         return stepHistory;
     }
+    // -------------------------------------
 
     // Update posisi dan simpan ke stack
     public void setPosition(int newPosition) {
@@ -37,9 +39,8 @@ public class Player {
         this.stepHistory.push(newPosition);
     }
 
-    public void reset() {
-        this.position = 1;
-        this.stepHistory.clear();
-        this.stepHistory.push(1);
+    // Method khusus untuk animasi agar tidak menumpuk history berlebihan
+    public void setPositionRaw(int newPosition) {
+        this.position = newPosition;
     }
 }
