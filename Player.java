@@ -5,12 +5,14 @@ public class Player {
     private String name;
     private int position;
     private Color color;
+    private int score; // Fitur Score
     private Stack<Integer> stepHistory;
 
     public Player(String name, Color color) {
         this.name = name;
         this.color = color;
-        this.position = 1; // Start di kotak 1
+        this.position = 1;
+        this.score = 0; // Score awal 0
         this.stepHistory = new Stack<>();
         this.stepHistory.push(1);
     }
@@ -27,19 +29,25 @@ public class Player {
         return color;
     }
 
-    // --- METHOD YANG SEBELUMNYA HILANG ---
+    // --- SCORE METHODS ---
+    public int getScore() {
+        return score;
+    }
+
+    public void addScore(int points) {
+        this.score += points;
+    }
+    // ---------------------
+
     public Stack<Integer> getHistory() {
         return stepHistory;
     }
-    // -------------------------------------
 
-    // Update posisi dan simpan ke stack
     public void setPosition(int newPosition) {
         this.position = newPosition;
         this.stepHistory.push(newPosition);
     }
 
-    // Method khusus untuk animasi agar tidak menumpuk history berlebihan
     public void setPositionRaw(int newPosition) {
         this.position = newPosition;
     }

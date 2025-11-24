@@ -3,6 +3,7 @@ import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Random;
 
 public class BoardPanel extends JPanel {
     private final int ROWS = 8;
@@ -10,18 +11,38 @@ public class BoardPanel extends JPanel {
     private int[][] boardMatrix = new int[ROWS][COLS];
     private JPanel[] squarePanels = new JPanel[65];
 
-    // Data Tangga untuk Visualisasi
+    // Simpan nilai poin per kotak
+    private int[] tilePoints = new int[65];
+
     private Map<Integer, Integer> laddersVisual;
 
     public BoardPanel() {
         setLayout(new GridLayout(ROWS, COLS));
         initMatrixData();
+        initTilePoints(); // Generate poin
         initVisualUI();
+    }
+
+    // Generate poin random (10 - 50) per kotak
+    private void initTilePoints() {
+        Random rand = new Random();
+        tilePoints[1] = 0; // Start tidak ada poin
+        for (int i = 2; i <= 64; i++) {
+            tilePoints[i] = (rand.nextInt(5) + 1) * 10;
+        }
+    }
+
+    // Method publik untuk mengambil poin
+    public int getPointsAt(int pos) {
+        if (pos >= 1 && pos <= 64) {
+            return tilePoints[pos];
+        }
+        return 0;
     }
 
     public void setLaddersMap(Map<Integer, Integer> ladders) {
         this.laddersVisual = ladders;
-        repaint(); // Gambar garis saat data diterima
+        repaint();
     }
 
     private void initMatrixData() {
@@ -59,28 +80,34 @@ public class BoardPanel extends JPanel {
         }
         panel.setBorder(new LineBorder(Color.GRAY));
 
-        JLabel label = new JLabel(String.valueOf(number));
-        label.setFont(new Font("Arial", Font.BOLD, 14));
-        label.setBorder(BorderFactory.createEmptyBorder(2, 5, 0, 0));
-        panel.add(label, BorderLayout.NORTH);
+        JLabel numLabel = new JLabel(String.valueOf(number));
+        numLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        numLabel.setBorder(BorderFactory.createEmptyBorder(2, 5, 0, 0));
+        panel.add(numLabel, BorderLayout.NORTH);
+
+        // Tampilkan Label Poin di Bawah Kotak
+        if (number > 1) {
+            JLabel ptLabel = new JLabel("+" + tilePoints[number]);
+            ptLabel.setFont(new Font("Arial", Font.PLAIN, 10));
+            ptLabel.setForeground(Color.GRAY);
+            ptLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            panel.add(ptLabel, BorderLayout.SOUTH);
+        }
 
         return panel;
     }
 
     public void updatePlayerPawns(Collection<Player> players) {
-        // 1. Bersihkan semua pawn dari papan
+        // Hapus pawn lama, tapi pertahankan label angka & poin
         for (int i = 1; i <= 64; i++) {
             JPanel sq = squarePanels[i];
             if (sq == null) continue;
-            Component centerComp = ((BorderLayout)sq.getLayout()).getLayoutComponent(BorderLayout.CENTER);
+            BorderLayout layout = (BorderLayout) sq.getLayout();
+            Component centerComp = layout.getLayoutComponent(BorderLayout.CENTER);
             if (centerComp != null) sq.remove(centerComp);
-
-            // Kita tidak perlu repaint per kotak di sini, karena kita akan repaint full di bawah
         }
 
-        // 2. Jika players belum ada, tetap lakukan repaint untuk gambar garis
         if (players != null && !players.isEmpty()) {
-            // Gambar Ulang Pawn Baru
             for (Player p : players) {
                 int pos = Math.min(p.getPosition(), 64);
                 pos = Math.max(pos, 1);
@@ -91,37 +118,28 @@ public class BoardPanel extends JPanel {
                 pawn.setBackground(p.getColor());
                 pawn.setPreferredSize(new Dimension(25, 25));
                 pawn.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-                pawn.setToolTipText(p.getName());
+                // Tooltip menampilkan Score juga
+                pawn.setToolTipText(p.getName() + " | Score: " + p.getScore());
 
                 JPanel wrapper = new JPanel(new GridBagLayout());
                 wrapper.setOpaque(false);
                 wrapper.add(pawn);
 
                 targetSquare.add(wrapper, BorderLayout.CENTER);
-                targetSquare.revalidate(); // Revalidate layout kotak
+                targetSquare.revalidate();
             }
         }
-
-        // --- KUNCI PERBAIKAN ---
-        // Panggil repaint() pada BoardPanel (this).
-        // Ini memaksa Java menggambar ulang Panel UTAMA beserta garis-garisnya
-        // SETELAH pion-pion ditempatkan.
         this.repaint();
     }
 
-    // Menggambar Garis Tangga
-    // Gunakan paintChildren agar digambar SETELAH kotak-kotak (background) dirender
     @Override
     protected void paintChildren(Graphics g) {
-        super.paintChildren(g); // Gambar dulu anak-anaknya (Kotak papan & Pion)
+        super.paintChildren(g);
 
-        // Sekarang gambar garis overlay di atasnya
         if (laddersVisual == null || laddersVisual.isEmpty()) return;
 
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        // Set Stroke dan Warna Garis
         g2.setStroke(new BasicStroke(3));
 
         for (Map.Entry<Integer, Integer> entry : laddersVisual.entrySet()) {
@@ -132,20 +150,16 @@ public class BoardPanel extends JPanel {
             JPanel pEnd = squarePanels[endNode];
 
             if (pStart != null && pEnd != null) {
-                // Ambil koordinat tengah panel relatif terhadap BoardPanel
                 Point p1 = SwingUtilities.convertPoint(pStart, pStart.getWidth()/2, pStart.getHeight()/2, this);
                 Point p2 = SwingUtilities.convertPoint(pEnd, pEnd.getWidth()/2, pEnd.getHeight()/2, this);
 
-                // Gambar Garis Transparan
                 g2.setColor(new Color(80, 80, 80, 180));
                 g2.drawLine(p1.x, p1.y, p2.x, p2.y);
 
-                // Gambar Titik Start (Merah)
                 int dotSize = 12;
                 g2.setColor(new Color(220, 20, 60));
                 g2.fillOval(p1.x - dotSize/2, p1.y - dotSize/2, dotSize, dotSize);
 
-                // Gambar Titik End (Hijau)
                 g2.setColor(new Color(34, 139, 34));
                 g2.fillOval(p2.x - dotSize/2, p2.y - dotSize/2, dotSize, dotSize);
             }

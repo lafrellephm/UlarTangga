@@ -7,48 +7,48 @@ import java.util.List;
 
 public class UlarTanggaMain extends JFrame {
 
-    // Main UI Components
+    // Main UI
     private BoardPanel boardPanel;
     private JPanel rightPanelContainer;
     private CardLayout cardLayout;
 
-    // --- SETUP PANEL COMPONENTS ---
+    // Setup Panel
     private JPanel setupPanel;
     private JComboBox<Integer> playerCountCombo;
     private JPanel namesInputPanel;
     private List<JTextField> nameFields;
 
-    // --- GAME PANEL COMPONENTS ---
+    // Game Panel Components
     private JPanel gamePanel;
     private JTextArea logArea;
+    private JTextArea scoreBoardArea;
     private JButton rollButton;
     private JLabel turnLabel;
 
     // Logic Data
-    private Deque<Player> playerQueue;
+    private Deque<Player> playerQueue; // Queue untuk giliran (Urutan berubah-ubah)
+    private List<Player> fixedPlayerList; // List untuk Scoreboard (Urutan TETAP)
+
     private Random random;
     private Map<Integer, Integer> ladders;
+    private final int FINISH_BONUS = 100;
 
     public UlarTanggaMain() {
-        super("Ular Tangga (Integrated Setup)");
+        super("Ular Tangga (Fixed Realtime Scoreboard)");
         try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception e) {}
 
-        // 1. Init Data
         random = new Random();
         initLadders();
 
-        // 2. Setup Frame Utama
         setSize(1100, 750);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
-        // 3. Board Panel (Langsung dipasang agar garis terlihat)
         boardPanel = new BoardPanel();
         boardPanel.setLaddersMap(ladders);
         add(boardPanel, BorderLayout.CENTER);
 
-        // 4. Init Right Panel (CardLayout: Setup vs Game)
         initRightPanel();
         add(rightPanelContainer, BorderLayout.EAST);
 
@@ -74,11 +74,10 @@ public class UlarTanggaMain extends JFrame {
 
         rightPanelContainer.add(setupPanel, "SETUP");
         rightPanelContainer.add(gamePanel, "GAME");
-
         cardLayout.show(rightPanelContainer, "SETUP");
     }
 
-    // --- HALAMAN 1: SETUP ---
+    // --- SETUP PANEL ---
     private void createSetupPanel() {
         setupPanel = new JPanel(new BorderLayout());
         setupPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
@@ -102,7 +101,6 @@ public class UlarTanggaMain extends JFrame {
         namesInputPanel = new JPanel();
         namesInputPanel.setLayout(new BoxLayout(namesInputPanel, BoxLayout.Y_AXIS));
         nameFields = new ArrayList<>();
-
         updateNameFields(2);
 
         playerCountCombo.addActionListener(e -> {
@@ -116,9 +114,8 @@ public class UlarTanggaMain extends JFrame {
         JButton btnStart = new JButton("START GAME");
         btnStart.setFont(new Font("Arial", Font.BOLD, 16));
         btnStart.setBackground(new Color(70, 130, 180));
-        btnStart.setForeground(Color.GREEN);
+        btnStart.setForeground(Color.WHITE);
         btnStart.setPreferredSize(new Dimension(100, 50));
-
         btnStart.addActionListener(e -> startGame());
 
         setupPanel.add(btnStart, BorderLayout.SOUTH);
@@ -127,16 +124,13 @@ public class UlarTanggaMain extends JFrame {
     private void updateNameFields(int count) {
         namesInputPanel.removeAll();
         nameFields.clear();
-
         for (int i = 0; i < count; i++) {
             JPanel p = new JPanel(new BorderLayout());
             p.setBorder(new EmptyBorder(5, 0, 5, 0));
             p.add(new JLabel("Nama Player " + (i + 1) + ":"), BorderLayout.NORTH);
-
             JTextField tf = new JTextField("Player " + (i + 1));
             nameFields.add(tf);
             p.add(tf, BorderLayout.CENTER);
-
             namesInputPanel.add(p);
         }
         namesInputPanel.revalidate();
@@ -145,61 +139,91 @@ public class UlarTanggaMain extends JFrame {
 
     private void startGame() {
         playerQueue = new LinkedList<>();
+        fixedPlayerList = new ArrayList<>(); // Inisialisasi list tetap
+
         Color[] colors = {Color.RED, Color.BLUE, Color.GREEN, Color.ORANGE};
 
         int count = nameFields.size();
         for (int i = 0; i < count; i++) {
             String name = nameFields.get(i).getText().trim();
             if (name.isEmpty()) name = "Player " + (i + 1);
-            playerQueue.add(new Player(name, colors[i]));
+
+            Player newPlayer = new Player(name, colors[i]);
+
+            // Masukkan ke kedua koleksi
+            playerQueue.add(newPlayer);       // Untuk logika giliran (berputar)
+            fixedPlayerList.add(newPlayer);   // Untuk display scoreboard (tetap)
         }
 
         boardPanel.updatePlayerPawns(playerQueue);
-
         turnLabel.setText("Giliran: " + playerQueue.peek().getName());
         logArea.setText("Game Dimulai!\n----------------\n");
+        updateScoreBoard();
 
         cardLayout.show(rightPanelContainer, "GAME");
     }
 
-    // --- HALAMAN 2: GAME CONTROL ---
+    // --- GAME PANEL ---
     private void createGamePanel() {
         gamePanel = new JPanel(new BorderLayout());
         gamePanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
+        JPanel topInfoPanel = new JPanel(new BorderLayout());
+
         JTextArea infoTxt = new JTextArea(
-                "Info Aturan:\n" +
+                "Rules:\n" +
                         "1. Naik Tangga: Start = PRIMA.\n" +
-                        "2. Extra Turn: Di KELIPATAN 5.\n" +
-                        "3. Merah: Mundur 1 langkah.\n" + // Update Text Info
-                        "Linked Nodes:\n4->14, 12->28, 24->36, 42->58, 50->60\n"
+                        "2. Merah: Mundur 1 langkah.\n" +
+                        "3. Pemenang = POIN TERTINGGI."
         );
         infoTxt.setFont(new Font("Arial", Font.ITALIC, 11));
         infoTxt.setEditable(false);
         infoTxt.setBackground(new Color(240, 240, 240));
+        infoTxt.setBorder(new EmptyBorder(0,0,10,0));
+
+        scoreBoardArea = new JTextArea(5, 20);
+        scoreBoardArea.setEditable(false);
+        scoreBoardArea.setFont(new Font("Monospaced", Font.BOLD, 12));
+        JScrollPane scoreScroll = new JScrollPane(scoreBoardArea);
+        scoreScroll.setBorder(new TitledBorder("Live Scoreboard"));
+
+        topInfoPanel.add(infoTxt, BorderLayout.NORTH);
+        topInfoPanel.add(scoreScroll, BorderLayout.CENTER);
 
         logArea = new JTextArea();
         logArea.setEditable(false);
         logArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-        JScrollPane scroll = new JScrollPane(logArea);
-        scroll.setBorder(new TitledBorder("Game Log"));
+        JScrollPane logScroll = new JScrollPane(logArea);
+        logScroll.setBorder(new TitledBorder("Game Log"));
 
-        JPanel btnPanel = new JPanel(new GridLayout(3, 1, 5, 5));
+        JPanel btnPanel = new JPanel(new GridLayout(2, 1, 5, 5));
         turnLabel = new JLabel("Giliran: -", SwingConstants.CENTER);
         turnLabel.setFont(new Font("Arial", Font.BOLD, 18));
 
         rollButton = new JButton("ROLL DADU");
         rollButton.setFont(new Font("Arial", Font.BOLD, 16));
         rollButton.setBackground(new Color(46, 139, 87));
-        rollButton.setForeground(Color.BLUE);
+        rollButton.setForeground(Color.WHITE);
         rollButton.addActionListener(e -> processTurnWithAnimation());
 
-        btnPanel.add(infoTxt);
         btnPanel.add(turnLabel);
         btnPanel.add(rollButton);
 
-        gamePanel.add(scroll, BorderLayout.CENTER);
+        gamePanel.add(topInfoPanel, BorderLayout.NORTH);
+        gamePanel.add(logScroll, BorderLayout.CENTER);
         gamePanel.add(btnPanel, BorderLayout.SOUTH);
+    }
+
+    // --- LOGIKA UTAMA ---
+
+    // PERBAIKAN: Gunakan fixedPlayerList agar urutan nama TIDAK berubah
+    private void updateScoreBoard() {
+        StringBuilder sb = new StringBuilder();
+        // Loop berdasarkan list yang urutannya statis
+        for (Player p : fixedPlayerList) {
+            sb.append(String.format("%-10s : %d pts\n", p.getName(), p.getScore()));
+        }
+        scoreBoardArea.setText(sb.toString());
     }
 
     private boolean isPrime(int n) {
@@ -210,7 +234,6 @@ public class UlarTanggaMain extends JFrame {
         return true;
     }
 
-    // --- LOGIKA UTAMA (MODIFIED) ---
     private void processTurnWithAnimation() {
         rollButton.setEnabled(false);
         Player currentPlayer = playerQueue.poll();
@@ -220,18 +243,12 @@ public class UlarTanggaMain extends JFrame {
 
         int diceVal = random.nextInt(6) + 1;
         double chance = random.nextDouble();
-        boolean isGreen = chance < 0.7; // 70% Peluang Maju
+        boolean isGreen = chance < 0.7;
 
-        // --- BAGIAN YANG DIUBAH ---
         int finalDicePos = startPos;
-        if (isGreen) {
-            finalDicePos += diceVal; // Maju sesuai dadu
-        } else {
-            finalDicePos -= 1;       // Mundur HANYA 1 langkah (penalti tetap)
-        }
-        // ---------------------------
+        if (isGreen) finalDicePos += diceVal;
+        else finalDicePos -= 1;
 
-        // Validasi Batas
         if (finalDicePos < 1) finalDicePos = 1;
         if (finalDicePos > 64) finalDicePos = 64;
 
@@ -246,8 +263,6 @@ public class UlarTanggaMain extends JFrame {
             protected Void doInBackground() throws Exception {
                 int current = startPos;
                 int step = (targetPos > startPos) ? 1 : -1;
-
-                // Loop animasi
                 while (current != targetPos) {
                     Thread.sleep(1000);
                     current += step;
@@ -281,8 +296,6 @@ public class UlarTanggaMain extends JFrame {
                 ladderTimer.setInitialDelay(1000);
                 ladderTimer.start();
                 return;
-            } else {
-                logArea.append(">> Kaki Tangga di " + currentPos + ", tapi Start bukan Prima.\n");
             }
         }
         finishTurn(player, currentPos);
@@ -290,13 +303,26 @@ public class UlarTanggaMain extends JFrame {
 
     private void finishTurn(Player player, int finalPos) {
         player.setPosition(finalPos);
+
+        // Update Poin
+        int gainedPoints = boardPanel.getPointsAt(finalPos);
+        player.addScore(gainedPoints);
+        logArea.append("Mendarat di " + finalPos + ". Dapat +" + gainedPoints + " poin.\n");
+
         boardPanel.updatePlayerPawns(getAllPlayersIncluding(player));
-        logArea.append("Posisi Akhir: " + finalPos + "\n");
+
+        // Update Scoreboard (Nama tetap, Poin berubah)
+        updateScoreBoard();
 
         if (finalPos == 64) {
-            JOptionPane.showMessageDialog(this, "SELAMAT!\n" + player.getName() + " MENANG!");
-            rollButton.setEnabled(false);
+            player.addScore(FINISH_BONUS);
+            logArea.append("FINISH! Bonus +" + FINISH_BONUS + " poin.\n");
+            updateScoreBoard();
+
             playerQueue.addLast(player);
+            showWinnerDialog();
+
+            rollButton.setEnabled(false);
             return;
         }
 
@@ -315,9 +341,33 @@ public class UlarTanggaMain extends JFrame {
         rollButton.setEnabled(true);
     }
 
+    private void showWinnerDialog() {
+        PriorityQueue<Player> rankingQueue = new PriorityQueue<>(
+                (p1, p2) -> Integer.compare(p2.getScore(), p1.getScore())
+        );
+        rankingQueue.addAll(fixedPlayerList); // Gunakan fixed list, isinya sama saja
+
+        StringBuilder msg = new StringBuilder("PERMAINAN SELESAI!\n\nLeaderboard:\n");
+        int rank = 1;
+        String winnerName = "";
+
+        while (!rankingQueue.isEmpty()) {
+            Player p = rankingQueue.poll();
+            if (rank == 1) winnerName = p.getName();
+
+            msg.append(rank).append(". ").append(p.getName())
+                    .append(" - Skor: ").append(p.getScore()).append("\n");
+            rank++;
+        }
+
+        JOptionPane.showMessageDialog(this, msg.toString(), "Winner: " + winnerName, JOptionPane.INFORMATION_MESSAGE);
+    }
+
     private Queue<Player> getAllPlayersIncluding(Player current) {
         Queue<Player> all = new LinkedList<>(playerQueue);
-        all.add(current);
+        if (!all.contains(current)) {
+            all.add(current);
+        }
         return all;
     }
 
