@@ -1,4 +1,6 @@
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.util.*;
 import java.util.List;
 import javax.swing.*;
@@ -27,8 +29,8 @@ public class UlarTanggaMain extends JFrame {
     private JLabel turnLabel;
 
     // Logic Data
-    private Deque<Player> playerQueue; // Queue untuk giliran (Urutan berubah-ubah)
-    private List<Player> fixedPlayerList; // List untuk Scoreboard (Urutan TETAP)
+    private Deque<Player> playerQueue; // Queue untuk giliran
+    private List<Player> fixedPlayerList; // List untuk Scoreboard
 
     private Random random;
     private Map<Integer, Integer> ladders;
@@ -41,15 +43,17 @@ public class UlarTanggaMain extends JFrame {
         random = new Random();
         initLadders();
 
-        setSize(1100, 750);
+        setSize(1200, 750); // Ukuran pas untuk layout baru
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
+        // 1. Init Board
         boardPanel = new BoardPanel();
         boardPanel.setLaddersMap(ladders);
         add(boardPanel, BorderLayout.CENTER);
 
+        // 2. Init Panel Kanan
         initRightPanel();
         add(rightPanelContainer, BorderLayout.EAST);
 
@@ -68,10 +72,11 @@ public class UlarTanggaMain extends JFrame {
     private void initRightPanel() {
         cardLayout = new CardLayout();
         rightPanelContainer = new JPanel(cardLayout);
-        rightPanelContainer.setPreferredSize(new Dimension(350, 700));
+        rightPanelContainer.setPreferredSize(new Dimension(400, 700));
 
+        // PENTING: Inisialisasi KEDUA panel di awal agar komponen siap
         createSetupPanel();
-        createGamePanel();
+        createGamePanel(); 
 
         rightPanelContainer.add(setupPanel, "SETUP");
         rightPanelContainer.add(gamePanel, "GAME");
@@ -138,104 +143,128 @@ public class UlarTanggaMain extends JFrame {
         namesInputPanel.repaint();
     }
 
+    // --- START GAME LOGIC ---
     private void startGame() {
-        playerQueue = new LinkedList<>();
-        fixedPlayerList = new ArrayList<>(); // Inisialisasi list tetap
+        try {
+            // Safety Check
+            if (turnLabel == null || logArea == null) {
+                // Harusnya tidak terjadi karena createGamePanel sudah dipanggil di initRightPanel
+                JOptionPane.showMessageDialog(this, "Error inisialisasi UI. Silakan restart aplikasi.");
+                return;
+            }
 
-        Color[] colors = {Color.RED, Color.BLUE, Color.GREEN, Color.ORANGE};
+            playerQueue = new LinkedList<>();
+            fixedPlayerList = new ArrayList<>();
 
-        int count = nameFields.size();
-        for (int i = 0; i < count; i++) {
-            String name = nameFields.get(i).getText().trim();
-            if (name.isEmpty()) name = "Player " + (i + 1);
+            Color[] colors = {Color.RED, Color.BLUE, Color.GREEN, Color.ORANGE};
 
-            Player newPlayer = new Player(name, colors[i]);
+            int count = nameFields.size();
+            for (int i = 0; i < count; i++) {
+                String name = nameFields.get(i).getText().trim();
+                if (name.isEmpty()) name = "Player " + (i + 1);
 
-            // Masukkan ke kedua koleksi
-            playerQueue.add(newPlayer);       // Untuk logika giliran (berputar)
-            fixedPlayerList.add(newPlayer);   // Untuk display scoreboard (tetap)
+                Player newPlayer = new Player(name, colors[i]);
+                playerQueue.add(newPlayer);
+                fixedPlayerList.add(newPlayer);
+            }
+
+            // Update Board
+            boardPanel.updatePlayerPawns(playerQueue);
+            
+            // Update Label Giliran
+            if (!playerQueue.isEmpty()) {
+                turnLabel.setText(playerQueue.peek().getName());
+            }
+
+            logArea.setText("Game Dimulai!\n----------------\n");
+            updateScoreBoard();
+
+            // Pindah Layar
+            cardLayout.show(rightPanelContainer, "GAME");
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Gagal memulai game: " + ex.getMessage());
         }
-
-        boardPanel.updatePlayerPawns(playerQueue);
-        turnLabel.setText("Giliran: " + playerQueue.peek().getName());
-        logArea.setText("Game Dimulai!\n----------------\n");
-        updateScoreBoard();
-
-        cardLayout.show(rightPanelContainer, "GAME");
     }
 
+    // --- GAME PANEL (LAYOUT VISUAL BARU) ---
     private void createGamePanel() {
         gamePanel = new JPanel(new BorderLayout());
         gamePanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        // --- BAGIAN KIRI (Rules, Score, Log) ---
-        JPanel leftContainer = new JPanel(new BorderLayout());
+        // 1. LOG & SCORE (KANAN - CENTER)
+        JPanel logScoreContainer = new JPanel(new BorderLayout());
         
-        // 1. Top Info (Rules & Score)
         JPanel topInfoPanel = new JPanel(new BorderLayout());
         JTextArea infoTxt = new JTextArea(
-                "Rules:\n" +
-                        "1. Naik Tangga: Start = PRIMA.\n" +
-                        "2. Merah: Mundur 1 langkah.\n" +
-                        "3. Pemenang = POIN TERTINGGI."
+                "Rules:\n1. Tangga: Start PRIMA.\n2. Merah: Mundur.\n3. Win: Skor Tertinggi."
         );
         infoTxt.setFont(new Font("Arial", Font.ITALIC, 11));
         infoTxt.setEditable(false);
         infoTxt.setBackground(new Color(240, 240, 240));
         infoTxt.setBorder(new EmptyBorder(0, 0, 10, 0));
 
-        scoreBoardArea = new JTextArea(5, 20);
+        scoreBoardArea = new JTextArea(5, 15);
         scoreBoardArea.setEditable(false);
         scoreBoardArea.setFont(new Font("Monospaced", Font.BOLD, 12));
         JScrollPane scoreScroll = new JScrollPane(scoreBoardArea);
-        scoreScroll.setBorder(new TitledBorder("Live Scoreboard"));
+        scoreScroll.setBorder(new TitledBorder("Live Score"));
 
         topInfoPanel.add(infoTxt, BorderLayout.NORTH);
         topInfoPanel.add(scoreScroll, BorderLayout.CENTER);
 
-        // 2. Log Area
         logArea = new JTextArea();
         logArea.setEditable(false);
         logArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         JScrollPane logScroll = new JScrollPane(logArea);
         logScroll.setBorder(new TitledBorder("Game Log"));
 
-        leftContainer.add(topInfoPanel, BorderLayout.NORTH);
-        leftContainer.add(logScroll, BorderLayout.CENTER);
+        logScoreContainer.add(topInfoPanel, BorderLayout.NORTH);
+        logScoreContainer.add(logScroll, BorderLayout.CENTER);
 
-        // --- BAGIAN KANAN (Visual Dadu) ---
-        dicePanel = new DicePanel(); // Inisialisasi Panel Dadu
-        JPanel rightSidePanel = new JPanel(new BorderLayout());
-        rightSidePanel.add(new JLabel("Visual Dadu", SwingConstants.CENTER), BorderLayout.NORTH);
-        rightSidePanel.add(dicePanel, BorderLayout.CENTER);
-        rightSidePanel.setBorder(new EmptyBorder(0, 5, 0, 0)); // Beri jarak sedikit
+        // 2. DADU AREA (KIRI - WEST) - Visual Dadu Tetap Ada
+        JPanel diceContainer = new JPanel();
+        diceContainer.setLayout(new BoxLayout(diceContainer, BoxLayout.Y_AXIS));
+        diceContainer.setBorder(new EmptyBorder(0, 5, 0, 10));
+        diceContainer.setPreferredSize(new Dimension(140, 0));
 
-        // --- BUTTON PANEL (Bawah) ---
-        JPanel btnPanel = new JPanel(new GridLayout(2, 1, 5, 5));
-        turnLabel = new JLabel("Giliran: -", SwingConstants.CENTER);
-        turnLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        turnLabel = new JLabel("Player 1", SwingConstants.CENTER);
+        turnLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        turnLabel.setForeground(new Color(0, 102, 204));
+        turnLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
+        JLabel labelStatic = new JLabel("Giliran Saat Ini:", SwingConstants.CENTER);
+        labelStatic.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        dicePanel = new DicePanel(); 
+        dicePanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        diceContainer.add(Box.createVerticalStrut(20));
+        diceContainer.add(labelStatic);
+        diceContainer.add(Box.createVerticalStrut(5));
+        diceContainer.add(turnLabel);
+        diceContainer.add(Box.createVerticalStrut(10));
+        diceContainer.add(dicePanel);
+        diceContainer.add(Box.createVerticalStrut(20));
+
+        // 3. BUTTON
         rollButton = new JButton("ROLL DADU");
         rollButton.setFont(new Font("Arial", Font.BOLD, 16));
         rollButton.setBackground(new Color(46, 139, 87));
         rollButton.setForeground(Color.BLUE);
         rollButton.addActionListener(e -> processTurnWithAnimation());
 
-        btnPanel.add(turnLabel);
-        btnPanel.add(rollButton);
-
-        // --- PENYUSUNAN AKHIR ---
-        gamePanel.add(leftContainer, BorderLayout.CENTER); // Log & Score di Tengah (memakan sisa ruang)
-        gamePanel.add(rightSidePanel, BorderLayout.EAST);  // Dadu di Kanan
-        gamePanel.add(btnPanel, BorderLayout.SOUTH);       // Tombol di Bawah
+        gamePanel.add(diceContainer, BorderLayout.WEST);
+        gamePanel.add(logScoreContainer, BorderLayout.CENTER); 
+        gamePanel.add(rollButton, BorderLayout.SOUTH);
     }
 
-    // --- LOGIKA UTAMA ---
+    // --- GAME LOGIC ---
 
-    // PERBAIKAN: Gunakan fixedPlayerList agar urutan nama TIDAK berubah
     private void updateScoreBoard() {
+        if (fixedPlayerList == null) return;
         StringBuilder sb = new StringBuilder();
-        // Loop berdasarkan list yang urutannya statis
         for (Player p : fixedPlayerList) {
             sb.append(String.format("%-10s : %d pts\n", p.getName(), p.getScore()));
         }
@@ -251,70 +280,51 @@ public class UlarTanggaMain extends JFrame {
     }
 
     private void processTurnWithAnimation() {
-        // 1. Matikan tombol dan mainkan suara kocok dadu
         rollButton.setEnabled(false);
         SoundUtility.playSound("dice_roll.wav");
 
-        // 2. Ambil data pemain (tanpa di-poll dulu dari queue agar aman jika animasi lama)
-        Player currentPlayer = playerQueue.peek(); 
-
-        // 3. Kalkulasi hasil dadu DI AWAL (sebelum animasi selesai)
         int realDiceVal = random.nextInt(6) + 1;
         double chance = random.nextDouble();
         boolean isGreen = chance < 0.7; // 70% Hijau
 
-        // 4. Animasi Dadu "Mengocok"
-        // Timer akan jalan setiap 80ms, sebanyak 15 kali (sekitar 1.2 detik)
         final int totalAnimationSteps = 15;
-        
         javax.swing.Timer diceTimer = new javax.swing.Timer(80, null);
-        diceTimer.addActionListener(new java.awt.event.ActionListener() {
+        diceTimer.addActionListener(new ActionListener() {
             int step = 0;
-
             @Override
-            public void actionPerformed(java.awt.event.ActionEvent e) {
+            public void actionPerformed(ActionEvent e) {
                 step++;
-                
-                // Selama animasi, ganti angka random & warna putih
                 dicePanel.setDiceColor(Color.WHITE);
                 dicePanel.setNumber(random.nextInt(6) + 1);
 
                 if (step >= totalAnimationSteps) {
-                    // --- ANIMASI SELESAI ---
                     diceTimer.stop();
-                    
-                    // 1. Set Angka Asli
                     dicePanel.setNumber(realDiceVal);
-                    
-                    // 2. Set Warna Sesuai Probabilitas
                     if (isGreen) {
-                        dicePanel.setDiceColor(new Color(144, 238, 144)); // Light Green
+                        dicePanel.setDiceColor(new Color(144, 238, 144));
                         SoundUtility.playSound("move_green.wav");
                     } else {
-                        dicePanel.setDiceColor(new Color(255, 99, 71));   // Tomato Red
+                        dicePanel.setDiceColor(new Color(255, 99, 71));
                         SoundUtility.playSound("move_red.wav");
                     }
-
-                    // 3. Panggil logika pergerakan (Log baru muncul di sini)
                     executeMovementLogic(realDiceVal, isGreen);
                 }
             }
         });
         diceTimer.start();
     }
+
     private void executeMovementLogic(int diceVal, boolean isGreen) {
-        // Ambil pemain dari antrian sekarang (karena animasi sudah selesai)
         Player currentPlayer = playerQueue.poll();
-        
+        if (currentPlayer == null) return;
+
         int startPos = currentPlayer.getPosition();
         boolean startIsPrime = isPrime(startPos);
         String direction = isGreen ? "[MAJU]" : "[MUNDUR -1]";
 
-        // --- UPDATE LOG (Baru muncul setelah dadu berhenti) ---
         logArea.append(String.format("%s (Pos: %d) Start Prima: %b\n", currentPlayer.getName(), startPos, startIsPrime));
         logArea.append(String.format("Dadu: %d %s\n", diceVal, direction));
 
-        // --- HITUNG PATH (Sama seperti sebelumnya) ---
         List<Integer> movementPath = new ArrayList<>();
         int currentSimPos = startPos;
         int stepsRemaining = diceVal;
@@ -327,32 +337,29 @@ public class UlarTanggaMain extends JFrame {
                     movementPath.add(currentSimPos);
                     break;
                 }
-                // Cek Tangga + Prima di tengah jalan
                 if (startIsPrime && ladders.containsKey(currentSimPos)) {
                     int ladderDest = ladders.get(currentSimPos);
-                    movementPath.add(currentSimPos); // Mampir dulu
+                    movementPath.add(currentSimPos); 
                     SoundUtility.playSound("ladder.wav");
-                    currentSimPos = ladderDest; // Lompat
+                    currentSimPos = ladderDest; 
                     logArea.append(">> LINKED NODE! Start Prima. Naik tangga -> " + ladderDest + "\n");
                 }
                 movementPath.add(currentSimPos);
                 stepsRemaining--;
             }
         } else {
-            // Logika Mundur
             currentSimPos = (currentSimPos - 1 < 1) ? 1 : currentSimPos - 1;
             movementPath.add(currentSimPos);
         }
 
         final int finalDestination = currentSimPos;
 
-        // --- SWING WORKER (Jalanin Pion) ---
         SwingWorker<Void, Integer> worker = new SwingWorker<>() {
             @Override
             protected Void doInBackground() throws Exception {
                 for (int pos : movementPath) {
                     SoundUtility.playSound("step.wav");
-                    Thread.sleep(600); 
+                    Thread.sleep(300); 
                     publish(pos);
                 }
                 return null;
@@ -372,45 +379,22 @@ public class UlarTanggaMain extends JFrame {
         };
         worker.execute();
     }
-    private void handleLadderLogic(Player player, int currentPos, boolean startWasPrime) {
-        if (ladders.containsKey(currentPos)) {
-            int ladderDest = ladders.get(currentPos);
-            if (startWasPrime) {
-                logArea.append(">> LINKED NODE! Start Prima. Naik ke " + ladderDest + "\n");
-                javax.swing.Timer ladderTimer = new javax.swing.Timer(1000, e -> {
-                    player.setPosition(ladderDest);
-                    finishTurn(player, ladderDest);
-                    ((javax.swing.Timer)e.getSource()).stop();
-                });
-                ladderTimer.setInitialDelay(1000);
-                ladderTimer.start();
-                return;
-            }
-        }
-        finishTurn(player, currentPos);
-    }
 
     private void finishTurn(Player player, int finalPos) {
         player.setPosition(finalPos);
-
-        // Update Poin
         int gainedPoints = boardPanel.getPointsAt(finalPos);
         player.addScore(gainedPoints);
         logArea.append("Mendarat di " + finalPos + ". Dapat +" + gainedPoints + " poin.\n");
 
         boardPanel.updatePlayerPawns(getAllPlayersIncluding(player));
-
-        // Update Scoreboard (Nama tetap, Poin berubah)
         updateScoreBoard();
 
         if (finalPos == 64) {
             player.addScore(FINISH_BONUS);
             logArea.append("FINISH! Bonus +" + FINISH_BONUS + " poin.\n");
             updateScoreBoard();
-
             playerQueue.addLast(player);
             showWinnerDialog();
-
             rollButton.setEnabled(false);
             return;
         }
@@ -419,10 +403,10 @@ public class UlarTanggaMain extends JFrame {
             logArea.append(">> EXTRA TURN! Kelipatan 5.\n");
             JOptionPane.showMessageDialog(this, player.getName() + " dapat EXTRA TURN!");
             playerQueue.addFirst(player);
-            turnLabel.setText("Giliran (LAGI): " + player.getName());
+            turnLabel.setText(player.getName() + " (LAGI)");
         } else {
             playerQueue.addLast(player);
-            turnLabel.setText("Giliran: " + playerQueue.peek().getName());
+            turnLabel.setText(playerQueue.peek().getName());
         }
 
         logArea.append("--------------------\n");
@@ -434,29 +418,23 @@ public class UlarTanggaMain extends JFrame {
         PriorityQueue<Player> rankingQueue = new PriorityQueue<>(
                 (p1, p2) -> Integer.compare(p2.getScore(), p1.getScore())
         );
-        rankingQueue.addAll(fixedPlayerList); // Gunakan fixed list, isinya sama saja
+        rankingQueue.addAll(fixedPlayerList);
 
         StringBuilder msg = new StringBuilder("PERMAINAN SELESAI!\n\nLeaderboard:\n");
         int rank = 1;
         String winnerName = "";
-
         while (!rankingQueue.isEmpty()) {
             Player p = rankingQueue.poll();
             if (rank == 1) winnerName = p.getName();
-
-            msg.append(rank).append(". ").append(p.getName())
-                    .append(" - Skor: ").append(p.getScore()).append("\n");
+            msg.append(rank).append(". ").append(p.getName()).append(" - Skor: ").append(p.getScore()).append("\n");
             rank++;
         }
-
         JOptionPane.showMessageDialog(this, msg.toString(), "Winner: " + winnerName, JOptionPane.INFORMATION_MESSAGE);
     }
 
     private Queue<Player> getAllPlayersIncluding(Player current) {
         Queue<Player> all = new LinkedList<>(playerQueue);
-        if (!all.contains(current)) {
-            all.add(current);
-        }
+        if (!all.contains(current)) all.add(current);
         return all;
     }
 
@@ -465,26 +443,57 @@ public class UlarTanggaMain extends JFrame {
     }
 }
 
-// --- CLASS TAMBAHAN: VISUAL DADU ---
-class DicePanel extends JPanel {
-    private int number = 1;
-    private Color diceColor = Color.WHITE; // Default warna dadu
+// --- HELPER CLASSES ---
 
-    public DicePanel() {
-        setPreferredSize(new Dimension(100, 100));
-        setBackground(new Color(230, 230, 250)); // Background panel (Lavender)
-        setBorder(new EmptyBorder(10, 10, 10, 10));
+class Player {
+    private String name;
+    private int position;
+    private int score;
+    private Color color;
+
+    public Player(String name, Color color) {
+        this.name = name;
+        this.color = color;
+        this.position = 1; 
+        this.score = 0;
     }
+    public void setPositionRaw(int pos) { this.position = pos; }
+    public void setPosition(int pos) { this.position = pos; }
+    public int getPosition() { return position; }
+    public String getName() { return name; }
+    public int getScore() { return score; }
+    public void addScore(int s) { this.score += s; }
+    public Color getColor() { return color; }
+}
 
-    public void setNumber(int number) {
-        this.number = number;
-        repaint();
+class SoundUtility {
+    public static void playSound(String filename) {
+        // Implementasi suara jika ada
     }
+}
 
-    // Method baru untuk ganti warna dadu
-    public void setDiceColor(Color color) {
-        this.diceColor = color;
-        repaint();
+// --- BOARD PANEL (Visual Tangga Realistis) ---
+class BoardPanel extends JPanel {
+    private Map<Integer, Integer> ladders;
+    private Queue<Player> players; 
+
+    public BoardPanel() { this.setBackground(Color.WHITE); }
+    public void setLaddersMap(Map<Integer, Integer> ladders) { this.ladders = ladders; repaint(); }
+    public void updatePlayerPawns(Queue<Player> players) { this.players = new LinkedList<>(players); repaint(); }
+    public int getPointsAt(int pos) { return pos * 10; }
+
+    private Point getCoordForPos(int pos) {
+        if (pos < 1) pos = 1;
+        if (pos > 64) pos = 64;
+        int row = (pos - 1) / 8;
+        int col = (pos - 1) % 8;
+        if (row % 2 == 1) col = 7 - col;
+        int drawRow = 7 - row;
+        int w = getWidth();
+        int h = getHeight();
+        int cw = w / 8; 
+        int ch = h / 8;
+        return new Point(col * cw + cw/2, drawRow * ch + ch/2);
     }
 
     @Override
@@ -493,34 +502,114 @@ class DicePanel extends JPanel {
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        int w = getWidth();
-        int h = getHeight();
-        int diceSize = 70;
-        int x = (w - diceSize) / 2;
-        int y = (h - diceSize) / 2;
+        int w = getWidth(); int h = getHeight();
+        int cw = w / 8; int ch = h / 8;
 
-        // 1. Gambar Kotak Dadu dengan warna dinamis
-        g2.setColor(diceColor); // Pakai variabel diceColor
-        g2.fillRoundRect(x, y, diceSize, diceSize, 20, 20);
-        
+        // Grid
+        g2.setColor(Color.LIGHT_GRAY);
+        for (int i = 0; i <= 8; i++) {
+            g2.drawLine(0, i * ch, w, i * ch);
+            g2.drawLine(i * cw, 0, i * cw, h);
+        }
+
+        // Numbers
+        g2.setColor(Color.GRAY);
+        g2.setFont(new Font("Arial", Font.BOLD, 12));
+        for (int i = 1; i <= 64; i++) {
+            Point p = getCoordForPos(i);
+            g2.drawString(String.valueOf(i), p.x - cw/2 + 5, p.y + ch/2 - 5);
+        }
+
+        // Real Ladder
+        if (ladders != null) {
+            for (Map.Entry<Integer, Integer> entry : ladders.entrySet()) {
+                Point pStart = getCoordForPos(entry.getKey());
+                Point pEnd = getCoordForPos(entry.getValue());
+                drawRealLadder(g2, pStart.x, pStart.y, pEnd.x, pEnd.y);
+            }
+        }
+
+        // Players
+        if (players != null) {
+            int offset = 0;
+            for (Player p : players) {
+                Point pt = getCoordForPos(p.getPosition());
+                int drawX = pt.x - 15 + offset; 
+                int drawY = pt.y - 15 + offset;
+                g2.setColor(p.getColor());
+                g2.fillOval(drawX, drawY, 30, 30);
+                g2.setColor(Color.BLACK);
+                g2.setStroke(new BasicStroke(2));
+                g2.drawOval(drawX, drawY, 30, 30);
+                g2.setColor(Color.WHITE);
+                String initial = (p.getName().length() > 0) ? p.getName().substring(0, 1).toUpperCase() : "?";
+                g2.drawString(initial, drawX + 10, drawY + 20);
+                offset += 5; 
+            }
+        }
+    }
+
+    private void drawRealLadder(Graphics2D g2, int x1, int y1, int x2, int y2) {
+        g2.setColor(new Color(139, 69, 19)); // Warna Kayu
+        double angle = Math.atan2(y2 - y1, x2 - x1);
+        int width = 20;
+        double offsetX = Math.sin(angle) * (width / 2.0);
+        double offsetY = Math.cos(angle) * (width / 2.0);
+        int r1x1 = (int) (x1 - offsetX), r1y1 = (int) (y1 + offsetY);
+        int r1x2 = (int) (x2 - offsetX), r1y2 = (int) (y2 + offsetY);
+        int r2x1 = (int) (x1 + offsetX), r2y1 = (int) (y1 - offsetY);
+        int r2x2 = (int) (x2 + offsetX), r2y2 = (int) (y2 - offsetY);
+        g2.setStroke(new BasicStroke(3));
+        g2.drawLine(r1x1, r1y1, r1x2, r1y2);
+        g2.drawLine(r2x1, r2y1, r2x2, r2y2);
+        g2.setStroke(new BasicStroke(2));
+        double distance = Math.hypot(x2 - x1, y2 - y1);
+        int steps = (int) (distance / 20);
+        for (int i = 0; i <= steps; i++) {
+            double ratio = (double) i / steps;
+            int sx1 = (int) (r1x1 + (r1x2 - r1x1) * ratio);
+            int sy1 = (int) (r1y1 + (r1y2 - r1y1) * ratio);
+            int sx2 = (int) (r2x1 + (r2x2 - r2x1) * ratio);
+            int sy2 = (int) (r2y1 + (r2y2 - r2y1) * ratio);
+            g2.drawLine(sx1, sy1, sx2, sy2);
+        }
+    }
+}
+
+// --- DICE PANEL (Visual Dadu 2D) ---
+class DicePanel extends JPanel {
+    private int number = 1;
+    private Color diceColor = Color.WHITE;
+
+    public DicePanel() {
+        setPreferredSize(new Dimension(80, 80));
+        setBackground(new Color(230, 230, 250));
+        setBorder(new EmptyBorder(5, 5, 5, 5));
+    }
+    public void setNumber(int number) { this.number = number; repaint(); }
+    public void setDiceColor(Color color) { this.diceColor = color; repaint(); }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        int w = getWidth(); int h = getHeight();
+        int diceSize = Math.min(w, h) - 10;
+        int x = (w - diceSize) / 2; int y = (h - diceSize) / 2;
+        g2.setColor(diceColor);
+        g2.fillRoundRect(x, y, diceSize, diceSize, 15, 15);
         g2.setColor(Color.BLACK);
         g2.setStroke(new BasicStroke(2));
-        g2.drawRoundRect(x, y, diceSize, diceSize, 20, 20);
-
-        // 2. Gambar Titik
-        g2.setColor(Color.BLACK); // Titik selalu hitam
-        int dotSize = 12;
+        g2.drawRoundRect(x, y, diceSize, diceSize, 15, 15);
+        g2.setColor(Color.BLACK);
+        int dotSize = diceSize / 6;
         int center = diceSize / 2;
-        int q1 = diceSize / 4;
-        int q3 = diceSize * 3 / 4;
-
+        int q1 = diceSize / 4; int q3 = diceSize * 3 / 4;
         if (number % 2 != 0) drawDot(g2, x + center, y + center, dotSize);
         if (number > 1) { drawDot(g2, x + q1, y + q1, dotSize); drawDot(g2, x + q3, y + q3, dotSize); }
         if (number > 3) { drawDot(g2, x + q3, y + q1, dotSize); drawDot(g2, x + q1, y + q3, dotSize); }
         if (number == 6) { drawDot(g2, x + q1, y + center, dotSize); drawDot(g2, x + q3, y + center, dotSize); }
     }
-
-    private void drawDot(Graphics2D g2, int x, int y, int size) {
-        g2.fillOval(x - size / 2, y - size / 2, size, size);
-    }
+    private void drawDot(Graphics2D g2, int x, int y, int size) { g2.fillOval(x - size / 2, y - size / 2, size, size); }
 }
