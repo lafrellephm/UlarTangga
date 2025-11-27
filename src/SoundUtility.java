@@ -6,7 +6,7 @@ public class SoundUtility {
 
     // Ganti "sounds/" sesuai lokasi folder audio Anda. 
     // Jika file ada di root project, hapus "sounds/".
-    private static final String SOUND_PATH = "sounds/";
+    private static final String SOUND_PATH = "sound/";
 
     public static void playSound(String filename) {
         new Thread(() -> {
