@@ -349,7 +349,24 @@ public class UlarTanggaMain extends JFrame {
             }
         } else {
             currentSimPos = (currentSimPos - 1 < 1) ? 1 : currentSimPos - 1;
-            movementPath.add(currentSimPos);
+            movementPath.add(currentSimPos); // Rekam posisi mundur
+
+            // 2. CEK TANGGA SETELAH MUNDUR
+            // Syarat: Start Awal Prima & Posisi sekarang (setelah mundur) adalah kaki tangga
+            if (startIsPrime && ladders.containsKey(currentSimPos)) {
+                int ladderDest = ladders.get(currentSimPos);
+
+                // Mainkan suara tangga (karena Anda sudah menambahkan fitur sound)
+                SoundUtility.playSound("ladder.wav");
+
+                // Update posisi langsung ke ujung tangga
+                currentSimPos = ladderDest;
+
+                // Tambahkan ke path animasi agar bidak terlihat melompat naik
+                movementPath.add(currentSimPos);
+
+                logArea.append(">> RED CARD LUCKY! Mundur ke tangga & Start Prima -> Naik ke " + ladderDest + "\n");
+            }
         }
 
         final int finalDestination = currentSimPos;
