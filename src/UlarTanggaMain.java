@@ -1,8 +1,6 @@
 import java.awt.*;
 import java.util.*;
 import java.util.List;
-import java.util.Queue;
-
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
@@ -253,91 +251,108 @@ public class UlarTanggaMain extends JFrame {
     }
 
     private void processTurnWithAnimation() {
+        // 1. Matikan tombol dan mainkan suara kocok dadu
+        rollButton.setEnabled(false);
         SoundUtility.playSound("dice_roll.wav");
 
-        rollButton.setEnabled(false);
-        Player currentPlayer = playerQueue.poll();
+        // 2. Ambil data pemain (tanpa di-poll dulu dari queue agar aman jika animasi lama)
+        Player currentPlayer = playerQueue.peek(); 
 
+        // 3. Kalkulasi hasil dadu DI AWAL (sebelum animasi selesai)
+        int realDiceVal = random.nextInt(6) + 1;
+        double chance = random.nextDouble();
+        boolean isGreen = chance < 0.7; // 70% Hijau
+
+        // 4. Animasi Dadu "Mengocok"
+        // Timer akan jalan setiap 80ms, sebanyak 15 kali (sekitar 1.2 detik)
+        final int totalAnimationSteps = 15;
+        
+        javax.swing.Timer diceTimer = new javax.swing.Timer(80, null);
+        diceTimer.addActionListener(new java.awt.event.ActionListener() {
+            int step = 0;
+
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                step++;
+                
+                // Selama animasi, ganti angka random & warna putih
+                dicePanel.setDiceColor(Color.WHITE);
+                dicePanel.setNumber(random.nextInt(6) + 1);
+
+                if (step >= totalAnimationSteps) {
+                    // --- ANIMASI SELESAI ---
+                    diceTimer.stop();
+                    
+                    // 1. Set Angka Asli
+                    dicePanel.setNumber(realDiceVal);
+                    
+                    // 2. Set Warna Sesuai Probabilitas
+                    if (isGreen) {
+                        dicePanel.setDiceColor(new Color(144, 238, 144)); // Light Green
+                        SoundUtility.playSound("move_green.wav");
+                    } else {
+                        dicePanel.setDiceColor(new Color(255, 99, 71));   // Tomato Red
+                        SoundUtility.playSound("move_red.wav");
+                    }
+
+                    // 3. Panggil logika pergerakan (Log baru muncul di sini)
+                    executeMovementLogic(realDiceVal, isGreen);
+                }
+            }
+        });
+        diceTimer.start();
+    }
+    private void executeMovementLogic(int diceVal, boolean isGreen) {
+        // Ambil pemain dari antrian sekarang (karena animasi sudah selesai)
+        Player currentPlayer = playerQueue.poll();
+        
         int startPos = currentPlayer.getPosition();
         boolean startIsPrime = isPrime(startPos);
+        String direction = isGreen ? "[MAJU]" : "[MUNDUR -1]";
 
-        int diceVal = random.nextInt(6) + 1;
-        
-        // --- UPDATE VISUAL DADU DISINI ---
-        dicePanel.setNumber(diceVal); 
-        // ---------------------------------
+        // --- UPDATE LOG (Baru muncul setelah dadu berhenti) ---
+        logArea.append(String.format("%s (Pos: %d) Start Prima: %b\n", currentPlayer.getName(), startPos, startIsPrime));
+        logArea.append(String.format("Dadu: %d %s\n", diceVal, direction));
 
-        double chance = random.nextDouble();
-        // ... (lanjutkan sisa kode seperti sebelumnya tidak ada perubahan) ...
-        boolean isGreen = chance < 0.7;
-
-        // <--- [3] GREEN & RED (Status Pergerakan)
-        if (isGreen) {
-            SoundUtility.playSound("move_green.wav");
-        } else {
-            SoundUtility.playSound("move_red.wav");
-        }
-
-        // --- MULAI PERUBAHAN LOGIKA PATHFINDING ---
-
-        // Kita akan merekam setiap langkah ke dalam List agar animasi mengikuti alur
+        // --- HITUNG PATH (Sama seperti sebelumnya) ---
         List<Integer> movementPath = new ArrayList<>();
         int currentSimPos = startPos;
         int stepsRemaining = diceVal;
 
-        String direction = isGreen ? "[MAJU]" : "[MUNDUR -1]";
-        logArea.append(String.format("%s (Pos: %d) Start Prima: %b\n", currentPlayer.getName(), startPos, startIsPrime));
-        logArea.append(String.format("Dadu: %d %s\n", diceVal, direction));
-
         if (isGreen) {
-            // Loop sebanyak angka dadu
             while (stepsRemaining > 0) {
-                currentSimPos++; // Bergerak 1 langkah
-
-                // Batas Max 64
+                currentSimPos++;
                 if (currentSimPos > 64) {
                     currentSimPos = 64;
                     movementPath.add(currentSimPos);
                     break;
                 }
-
-                // LOGIKA UTAMA YANG ANDA MINTA:
-                // Jika Start Prima DAN tile yang diinjak sekarang adalah kaki tangga
+                // Cek Tangga + Prima di tengah jalan
                 if (startIsPrime && ladders.containsKey(currentSimPos)) {
                     int ladderDest = ladders.get(currentSimPos);
-
-                    // (Opsional) Tambahkan posisi kaki tangga ke path agar terlihat mampir sebentar
-                    movementPath.add(currentSimPos);
+                    movementPath.add(currentSimPos); // Mampir dulu
                     SoundUtility.playSound("ladder.wav");
-
-                    // Langsung lompat ke tujuan tangga
-                    currentSimPos = ladderDest;
-
-                    logArea.append(">> LINKED NODE! Start Prima. Naik tangga di tengah jalan -> " + ladderDest + "\n");
+                    currentSimPos = ladderDest; // Lompat
+                    logArea.append(">> LINKED NODE! Start Prima. Naik tangga -> " + ladderDest + "\n");
                 }
-
-                movementPath.add(currentSimPos); // Simpan posisi (bisa posisi biasa atau hasil lompatan tangga)
-                stepsRemaining--; // Kurangi sisa langkah dadu
+                movementPath.add(currentSimPos);
+                stepsRemaining--;
             }
         } else {
-            /// --- LOGIKA MUNDUR (MERAH) ---
-
-            // 1. Hitung mundur 1 langkah
+            // Logika Mundur
             currentSimPos = (currentSimPos - 1 < 1) ? 1 : currentSimPos - 1;
-            movementPath.add(currentSimPos); // Rekam posisi mundur
+            movementPath.add(currentSimPos);
         }
 
-        final int finalDestination = currentSimPos; // Simpan tujuan akhir untuk method done()
+        final int finalDestination = currentSimPos;
 
-        // --- UPDATE SWINGWORKER UNTUK MENGIKUTI PATH ---
-
+        // --- SWING WORKER (Jalanin Pion) ---
         SwingWorker<Void, Integer> worker = new SwingWorker<>() {
             @Override
             protected Void doInBackground() throws Exception {
-                // Iterasi sesuai path yang sudah kita hitung di atas
                 for (int pos : movementPath) {
                     SoundUtility.playSound("step.wav");
-                    Thread.sleep(600); // Delay per langkah (sedikit diperlambat agar lompatan terlihat)
+                    Thread.sleep(600); 
                     publish(pos);
                 }
                 return null;
@@ -345,7 +360,6 @@ public class UlarTanggaMain extends JFrame {
 
             @Override
             protected void process(List<Integer> chunks) {
-                // Update UI pawn ke posisi terbaru dari chunk
                 int latestPos = chunks.get(chunks.size() - 1);
                 currentPlayer.setPositionRaw(latestPos);
                 boardPanel.updatePlayerPawns(getAllPlayersIncluding(currentPlayer));
@@ -353,15 +367,11 @@ public class UlarTanggaMain extends JFrame {
 
             @Override
             protected void done() {
-                // PENTING: Kita ganti handleLadderLogic dengan finishTurn langsung.
-                // Alasannya: Logika tangga sudah kita proses "di tengah jalan" di loop pathfinding di atas.
-                // Jika kita panggil handleLadderLogic lagi, nanti dia bisa error atau memproses ulang.
                 finishTurn(currentPlayer, finalDestination);
             }
         };
         worker.execute();
     }
-
     private void handleLadderLogic(Player player, int currentPos, boolean startWasPrime) {
         if (ladders.containsKey(currentPos)) {
             int ladderDest = ladders.get(currentPos);
@@ -458,71 +468,56 @@ public class UlarTanggaMain extends JFrame {
 // --- CLASS TAMBAHAN: VISUAL DADU ---
 class DicePanel extends JPanel {
     private int number = 1;
+    private Color diceColor = Color.WHITE; // Default warna dadu
 
     public DicePanel() {
-        setPreferredSize(new Dimension(100, 100)); // Ukuran panel dadu
+        setPreferredSize(new Dimension(100, 100));
         setBackground(new Color(230, 230, 250)); // Background panel (Lavender)
         setBorder(new EmptyBorder(10, 10, 10, 10));
     }
 
     public void setNumber(int number) {
         this.number = number;
-        repaint(); // Gambar ulang saat angka berubah
+        repaint();
+    }
+
+    // Method baru untuk ganti warna dadu
+    public void setDiceColor(Color color) {
+        this.diceColor = color;
+        repaint();
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
-        
-        // Anti-aliasing agar lingkaran halus
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         int w = getWidth();
         int h = getHeight();
-        
-        // 1. Gambar Kotak Dadu (Putih dengan Border Hitam)
         int diceSize = 70;
         int x = (w - diceSize) / 2;
         int y = (h - diceSize) / 2;
 
-        g2.setColor(Color.WHITE);
+        // 1. Gambar Kotak Dadu dengan warna dinamis
+        g2.setColor(diceColor); // Pakai variabel diceColor
         g2.fillRoundRect(x, y, diceSize, diceSize, 20, 20);
         
         g2.setColor(Color.BLACK);
         g2.setStroke(new BasicStroke(2));
         g2.drawRoundRect(x, y, diceSize, diceSize, 20, 20);
 
-        // 2. Gambar Titik Dadu (Dot)
-        g2.setColor(Color.BLACK);
+        // 2. Gambar Titik
+        g2.setColor(Color.BLACK); // Titik selalu hitam
         int dotSize = 12;
         int center = diceSize / 2;
-        int q1 = diceSize / 4;      // Posisi seperempat
-        int q3 = diceSize * 3 / 4;  // Posisi tiga perempat
+        int q1 = diceSize / 4;
+        int q3 = diceSize * 3 / 4;
 
-        // Koordinat titik relatif terhadap kotak dadu (x, y)
-        // Titik Tengah (Ganjil: 1, 3, 5)
-        if (number % 2 != 0) {
-            drawDot(g2, x + center, y + center, dotSize);
-        }
-
-        // Titik Kiri Atas & Kanan Bawah (2, 3, 4, 5, 6)
-        if (number > 1) {
-            drawDot(g2, x + q1, y + q1, dotSize);
-            drawDot(g2, x + q3, y + q3, dotSize);
-        }
-
-        // Titik Kanan Atas & Kiri Bawah (4, 5, 6)
-        if (number > 3) {
-            drawDot(g2, x + q3, y + q1, dotSize);
-            drawDot(g2, x + q1, y + q3, dotSize);
-        }
-
-        // Titik Tengah Kiri & Tengah Kanan (6)
-        if (number == 6) {
-            drawDot(g2, x + q1, y + center, dotSize);
-            drawDot(g2, x + q3, y + center, dotSize);
-        }
+        if (number % 2 != 0) drawDot(g2, x + center, y + center, dotSize);
+        if (number > 1) { drawDot(g2, x + q1, y + q1, dotSize); drawDot(g2, x + q3, y + q3, dotSize); }
+        if (number > 3) { drawDot(g2, x + q3, y + q1, dotSize); drawDot(g2, x + q1, y + q3, dotSize); }
+        if (number == 6) { drawDot(g2, x + q1, y + center, dotSize); drawDot(g2, x + q3, y + center, dotSize); }
     }
 
     private void drawDot(Graphics2D g2, int x, int y, int size) {
