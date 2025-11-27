@@ -1,9 +1,11 @@
-import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
+import java.util.Queue;
+
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
 
 public class UlarTanggaMain extends JFrame {
 
@@ -11,6 +13,7 @@ public class UlarTanggaMain extends JFrame {
     private BoardPanel boardPanel;
     private JPanel rightPanelContainer;
     private CardLayout cardLayout;
+    private DicePanel dicePanel;
 
     // Setup Panel
     private JPanel setupPanel;
@@ -163,13 +166,15 @@ public class UlarTanggaMain extends JFrame {
         cardLayout.show(rightPanelContainer, "GAME");
     }
 
-    // --- GAME PANEL ---
     private void createGamePanel() {
         gamePanel = new JPanel(new BorderLayout());
         gamePanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
+        // --- BAGIAN KIRI (Rules, Score, Log) ---
+        JPanel leftContainer = new JPanel(new BorderLayout());
+        
+        // 1. Top Info (Rules & Score)
         JPanel topInfoPanel = new JPanel(new BorderLayout());
-
         JTextArea infoTxt = new JTextArea(
                 "Rules:\n" +
                         "1. Naik Tangga: Start = PRIMA.\n" +
@@ -179,7 +184,7 @@ public class UlarTanggaMain extends JFrame {
         infoTxt.setFont(new Font("Arial", Font.ITALIC, 11));
         infoTxt.setEditable(false);
         infoTxt.setBackground(new Color(240, 240, 240));
-        infoTxt.setBorder(new EmptyBorder(0,0,10,0));
+        infoTxt.setBorder(new EmptyBorder(0, 0, 10, 0));
 
         scoreBoardArea = new JTextArea(5, 20);
         scoreBoardArea.setEditable(false);
@@ -190,12 +195,24 @@ public class UlarTanggaMain extends JFrame {
         topInfoPanel.add(infoTxt, BorderLayout.NORTH);
         topInfoPanel.add(scoreScroll, BorderLayout.CENTER);
 
+        // 2. Log Area
         logArea = new JTextArea();
         logArea.setEditable(false);
         logArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         JScrollPane logScroll = new JScrollPane(logArea);
         logScroll.setBorder(new TitledBorder("Game Log"));
 
+        leftContainer.add(topInfoPanel, BorderLayout.NORTH);
+        leftContainer.add(logScroll, BorderLayout.CENTER);
+
+        // --- BAGIAN KANAN (Visual Dadu) ---
+        dicePanel = new DicePanel(); // Inisialisasi Panel Dadu
+        JPanel rightSidePanel = new JPanel(new BorderLayout());
+        rightSidePanel.add(new JLabel("Visual Dadu", SwingConstants.CENTER), BorderLayout.NORTH);
+        rightSidePanel.add(dicePanel, BorderLayout.CENTER);
+        rightSidePanel.setBorder(new EmptyBorder(0, 5, 0, 0)); // Beri jarak sedikit
+
+        // --- BUTTON PANEL (Bawah) ---
         JPanel btnPanel = new JPanel(new GridLayout(2, 1, 5, 5));
         turnLabel = new JLabel("Giliran: -", SwingConstants.CENTER);
         turnLabel.setFont(new Font("Arial", Font.BOLD, 18));
@@ -209,9 +226,10 @@ public class UlarTanggaMain extends JFrame {
         btnPanel.add(turnLabel);
         btnPanel.add(rollButton);
 
-        gamePanel.add(topInfoPanel, BorderLayout.NORTH);
-        gamePanel.add(logScroll, BorderLayout.CENTER);
-        gamePanel.add(btnPanel, BorderLayout.SOUTH);
+        // --- PENYUSUNAN AKHIR ---
+        gamePanel.add(leftContainer, BorderLayout.CENTER); // Log & Score di Tengah (memakan sisa ruang)
+        gamePanel.add(rightSidePanel, BorderLayout.EAST);  // Dadu di Kanan
+        gamePanel.add(btnPanel, BorderLayout.SOUTH);       // Tombol di Bawah
     }
 
     // --- LOGIKA UTAMA ---
@@ -244,7 +262,13 @@ public class UlarTanggaMain extends JFrame {
         boolean startIsPrime = isPrime(startPos);
 
         int diceVal = random.nextInt(6) + 1;
+        
+        // --- UPDATE VISUAL DADU DISINI ---
+        dicePanel.setNumber(diceVal); 
+        // ---------------------------------
+
         double chance = random.nextDouble();
+        // ... (lanjutkan sisa kode seperti sebelumnya tidak ada perubahan) ...
         boolean isGreen = chance < 0.7;
 
         // <--- [3] GREEN & RED (Status Pergerakan)
@@ -428,5 +452,80 @@ public class UlarTanggaMain extends JFrame {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new UlarTanggaMain());
+    }
+}
+
+// --- CLASS TAMBAHAN: VISUAL DADU ---
+class DicePanel extends JPanel {
+    private int number = 1;
+
+    public DicePanel() {
+        setPreferredSize(new Dimension(100, 100)); // Ukuran panel dadu
+        setBackground(new Color(230, 230, 250)); // Background panel (Lavender)
+        setBorder(new EmptyBorder(10, 10, 10, 10));
+    }
+
+    public void setNumber(int number) {
+        this.number = number;
+        repaint(); // Gambar ulang saat angka berubah
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g;
+        
+        // Anti-aliasing agar lingkaran halus
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        int w = getWidth();
+        int h = getHeight();
+        
+        // 1. Gambar Kotak Dadu (Putih dengan Border Hitam)
+        int diceSize = 70;
+        int x = (w - diceSize) / 2;
+        int y = (h - diceSize) / 2;
+
+        g2.setColor(Color.WHITE);
+        g2.fillRoundRect(x, y, diceSize, diceSize, 20, 20);
+        
+        g2.setColor(Color.BLACK);
+        g2.setStroke(new BasicStroke(2));
+        g2.drawRoundRect(x, y, diceSize, diceSize, 20, 20);
+
+        // 2. Gambar Titik Dadu (Dot)
+        g2.setColor(Color.BLACK);
+        int dotSize = 12;
+        int center = diceSize / 2;
+        int q1 = diceSize / 4;      // Posisi seperempat
+        int q3 = diceSize * 3 / 4;  // Posisi tiga perempat
+
+        // Koordinat titik relatif terhadap kotak dadu (x, y)
+        // Titik Tengah (Ganjil: 1, 3, 5)
+        if (number % 2 != 0) {
+            drawDot(g2, x + center, y + center, dotSize);
+        }
+
+        // Titik Kiri Atas & Kanan Bawah (2, 3, 4, 5, 6)
+        if (number > 1) {
+            drawDot(g2, x + q1, y + q1, dotSize);
+            drawDot(g2, x + q3, y + q3, dotSize);
+        }
+
+        // Titik Kanan Atas & Kiri Bawah (4, 5, 6)
+        if (number > 3) {
+            drawDot(g2, x + q3, y + q1, dotSize);
+            drawDot(g2, x + q1, y + q3, dotSize);
+        }
+
+        // Titik Tengah Kiri & Tengah Kanan (6)
+        if (number == 6) {
+            drawDot(g2, x + q1, y + center, dotSize);
+            drawDot(g2, x + q3, y + center, dotSize);
+        }
+    }
+
+    private void drawDot(Graphics2D g2, int x, int y, int size) {
+        g2.fillOval(x - size / 2, y - size / 2, size, size);
     }
 }
