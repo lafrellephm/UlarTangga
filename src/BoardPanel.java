@@ -4,6 +4,10 @@ import java.awt.*;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Random;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
 
 public class BoardPanel extends JPanel {
     private final int ROWS = 8;
@@ -98,37 +102,70 @@ public class BoardPanel extends JPanel {
     }
 
     public void updatePlayerPawns(Collection<Player> players) {
-        // Hapus pawn lama, tapi pertahankan label angka & poin
+        // 1. Bersihkan area tengah (CENTER) dari semua kotak terlebih dahulu
         for (int i = 1; i <= 64; i++) {
             JPanel sq = squarePanels[i];
             if (sq == null) continue;
+
+            // Ambil layout manager
             BorderLayout layout = (BorderLayout) sq.getLayout();
+            // Cari komponen yang ada di CENTER (biasanya tempat pawn)
             Component centerComp = layout.getLayoutComponent(BorderLayout.CENTER);
-            if (centerComp != null) sq.remove(centerComp);
+
+            // Hapus jika ada
+            if (centerComp != null) {
+                sq.remove(centerComp);
+            }
+            // Validasi ulang tampilan kotak
+            sq.revalidate();
+            sq.repaint();
         }
 
-        if (players != null && !players.isEmpty()) {
-            for (Player p : players) {
-                int pos = Math.min(p.getPosition(), 64);
-                pos = Math.max(pos, 1);
+        if (players == null || players.isEmpty()) return;
 
-                JPanel targetSquare = squarePanels[pos];
+        // 2. Kelompokkan pemain berdasarkan posisi mereka
+        // Key: Nomor Posisi (Integer), Value: List Player di posisi itu
+        Map<Integer, List<Player>> playersByPos = new HashMap<>();
 
+        for (Player p : players) {
+            int pos = Math.min(p.getPosition(), 64);
+            pos = Math.max(pos, 1);
+
+            // Masukkan player ke list yang sesuai dengan posisinya
+            playersByPos.computeIfAbsent(pos, k -> new ArrayList<>()).add(p);
+        }
+
+        // 3. Render pawn ke dalam kotak
+        for (Map.Entry<Integer, List<Player>> entry : playersByPos.entrySet()) {
+            int pos = entry.getKey();
+            List<Player> playersAtPos = entry.getValue();
+
+            JPanel targetSquare = squarePanels[pos];
+
+            // PENTING: Buat SATU container untuk menampung banyak pawn sekaligus
+            // FlowLayout akan menata pawn secara berjejer (horizontal)
+            JPanel pawnsContainer = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 2));
+            pawnsContainer.setOpaque(false); // Transparan agar warna kotak tetap terlihat
+
+            for (Player p : playersAtPos) {
                 JPanel pawn = new JPanel();
                 pawn.setBackground(p.getColor());
-                pawn.setPreferredSize(new Dimension(25, 25));
+
+                // Opsional: Perkecil ukuran sedikit jika ada banyak pemain di satu kotak
+                int size = (playersAtPos.size() > 2) ? 15 : 20;
+                pawn.setPreferredSize(new Dimension(size, size));
+
                 pawn.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-                // Tooltip menampilkan Score juga
                 pawn.setToolTipText(p.getName() + " | Score: " + p.getScore());
 
-                JPanel wrapper = new JPanel(new GridBagLayout());
-                wrapper.setOpaque(false);
-                wrapper.add(pawn);
-
-                targetSquare.add(wrapper, BorderLayout.CENTER);
-                targetSquare.revalidate();
+                pawnsContainer.add(pawn);
             }
+
+            // Tambahkan container yang berisi kumpulan pawn ke kotak
+            targetSquare.add(pawnsContainer, BorderLayout.CENTER);
+            targetSquare.revalidate();
         }
+
         this.repaint();
     }
 

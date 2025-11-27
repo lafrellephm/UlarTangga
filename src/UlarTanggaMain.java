@@ -114,7 +114,7 @@ public class UlarTanggaMain extends JFrame {
         JButton btnStart = new JButton("START GAME");
         btnStart.setFont(new Font("Arial", Font.BOLD, 16));
         btnStart.setBackground(new Color(70, 130, 180));
-        btnStart.setForeground(Color.WHITE);
+        btnStart.setForeground(Color.GREEN);
         btnStart.setPreferredSize(new Dimension(100, 50));
         btnStart.addActionListener(e -> startGame());
 
@@ -203,7 +203,7 @@ public class UlarTanggaMain extends JFrame {
         rollButton = new JButton("ROLL DADU");
         rollButton.setFont(new Font("Arial", Font.BOLD, 16));
         rollButton.setBackground(new Color(46, 139, 87));
-        rollButton.setForeground(Color.WHITE);
+        rollButton.setForeground(Color.BLUE);
         rollButton.addActionListener(e -> processTurnWithAnimation());
 
         btnPanel.add(turnLabel);
@@ -235,6 +235,8 @@ public class UlarTanggaMain extends JFrame {
     }
 
     private void processTurnWithAnimation() {
+        SoundUtility.playSound("dice_roll.wav");
+
         rollButton.setEnabled(false);
         Player currentPlayer = playerQueue.poll();
 
@@ -245,39 +247,109 @@ public class UlarTanggaMain extends JFrame {
         double chance = random.nextDouble();
         boolean isGreen = chance < 0.7;
 
-        int finalDicePos = startPos;
-        if (isGreen) finalDicePos += diceVal;
-        else finalDicePos -= 1;
+        // <--- [3] GREEN & RED (Status Pergerakan)
+        if (isGreen) {
+            SoundUtility.playSound("move_green.wav");
+        } else {
+            SoundUtility.playSound("move_red.wav");
+        }
 
-        if (finalDicePos < 1) finalDicePos = 1;
-        if (finalDicePos > 64) finalDicePos = 64;
+        // --- MULAI PERUBAHAN LOGIKA PATHFINDING ---
+
+        // Kita akan merekam setiap langkah ke dalam List agar animasi mengikuti alur
+        List<Integer> movementPath = new ArrayList<>();
+        int currentSimPos = startPos;
+        int stepsRemaining = diceVal;
 
         String direction = isGreen ? "[MAJU]" : "[MUNDUR -1]";
         logArea.append(String.format("%s (Pos: %d) Start Prima: %b\n", currentPlayer.getName(), startPos, startIsPrime));
-        logArea.append(String.format("Dadu: %d %s -> Target: %d\n", diceVal, direction, finalDicePos));
+        logArea.append(String.format("Dadu: %d %s\n", diceVal, direction));
 
-        final int targetPos = finalDicePos;
+        if (isGreen) {
+            // Loop sebanyak angka dadu
+            while (stepsRemaining > 0) {
+                currentSimPos++; // Bergerak 1 langkah
+
+                // Batas Max 64
+                if (currentSimPos > 64) {
+                    currentSimPos = 64;
+                    movementPath.add(currentSimPos);
+                    break;
+                }
+
+                // LOGIKA UTAMA YANG ANDA MINTA:
+                // Jika Start Prima DAN tile yang diinjak sekarang adalah kaki tangga
+                if (startIsPrime && ladders.containsKey(currentSimPos)) {
+                    int ladderDest = ladders.get(currentSimPos);
+
+                    // (Opsional) Tambahkan posisi kaki tangga ke path agar terlihat mampir sebentar
+                    movementPath.add(currentSimPos);
+                    SoundUtility.playSound("ladder.wav");
+
+                    // Langsung lompat ke tujuan tangga
+                    currentSimPos = ladderDest;
+
+                    logArea.append(">> LINKED NODE! Start Prima. Naik tangga di tengah jalan -> " + ladderDest + "\n");
+                }
+
+                movementPath.add(currentSimPos); // Simpan posisi (bisa posisi biasa atau hasil lompatan tangga)
+                stepsRemaining--; // Kurangi sisa langkah dadu
+            }
+        } else {
+            /// --- LOGIKA MUNDUR (MERAH) ---
+
+            // 1. Hitung mundur 1 langkah
+            currentSimPos = (currentSimPos - 1 < 1) ? 1 : currentSimPos - 1;
+            movementPath.add(currentSimPos); // Rekam posisi mundur
+
+            // 2. CEK TANGGA SETELAH MUNDUR
+            // Syarat: Start Awal Prima & Posisi sekarang (setelah mundur) adalah kaki tangga
+            if (startIsPrime && ladders.containsKey(currentSimPos)) {
+                int ladderDest = ladders.get(currentSimPos);
+
+                // Mainkan suara tangga (karena Anda sudah menambahkan fitur sound)
+                SoundUtility.playSound("ladder.wav");
+
+                // Update posisi langsung ke ujung tangga
+                currentSimPos = ladderDest;
+
+                // Tambahkan ke path animasi agar bidak terlihat melompat naik
+                movementPath.add(currentSimPos);
+
+                logArea.append(">> RED CARD LUCKY! Mundur ke tangga & Start Prima -> Naik ke " + ladderDest + "\n");
+            }
+        }
+
+        final int finalDestination = currentSimPos; // Simpan tujuan akhir untuk method done()
+
+        // --- UPDATE SWINGWORKER UNTUK MENGIKUTI PATH ---
 
         SwingWorker<Void, Integer> worker = new SwingWorker<>() {
             @Override
             protected Void doInBackground() throws Exception {
-                int current = startPos;
-                int step = (targetPos > startPos) ? 1 : -1;
-                while (current != targetPos) {
-                    Thread.sleep(1000);
-                    current += step;
-                    publish(current);
+                // Iterasi sesuai path yang sudah kita hitung di atas
+                for (int pos : movementPath) {
+                    SoundUtility.playSound("step.wav");
+                    Thread.sleep(600); // Delay per langkah (sedikit diperlambat agar lompatan terlihat)
+                    publish(pos);
                 }
                 return null;
             }
+
             @Override
             protected void process(List<Integer> chunks) {
-                currentPlayer.setPositionRaw(chunks.get(chunks.size() - 1));
+                // Update UI pawn ke posisi terbaru dari chunk
+                int latestPos = chunks.get(chunks.size() - 1);
+                currentPlayer.setPositionRaw(latestPos);
                 boardPanel.updatePlayerPawns(getAllPlayersIncluding(currentPlayer));
             }
+
             @Override
             protected void done() {
-                handleLadderLogic(currentPlayer, targetPos, startIsPrime);
+                // PENTING: Kita ganti handleLadderLogic dengan finishTurn langsung.
+                // Alasannya: Logika tangga sudah kita proses "di tengah jalan" di loop pathfinding di atas.
+                // Jika kita panggil handleLadderLogic lagi, nanti dia bisa error atau memproses ulang.
+                finishTurn(currentPlayer, finalDestination);
             }
         };
         worker.execute();
