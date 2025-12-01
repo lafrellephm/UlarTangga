@@ -37,6 +37,11 @@ public class Player {
     public void addScore(int points) {
         this.score += points;
     }
+
+    // [BARU] Setter manual untuk memuat skor dari sesi sebelumnya
+    public void setScore(int score) {
+        this.score = score;
+    }
     // ---------------------
 
     public Stack<Integer> getHistory() {
@@ -50,5 +55,32 @@ public class Player {
 
     public void setPositionRaw(int newPosition) {
         this.position = newPosition;
+    }
+
+    // Mengintip posisi sebelumnya tanpa mengubah Stack (Untuk Logic Penentuan Target)
+    public int getPreviousPosition() {
+        // Size > 1 artinya minimal ada [PosisiAwal, PosisiSekarang]
+        if (stepHistory.size() > 1) {
+            // Ambil elemen kedua dari atas (size - 2)
+            return stepHistory.get(stepHistory.size() - 2);
+        }
+        // Jika baru mulai (cuma ada 1 data), tetap di posisi sekarang
+        return position;
+    }
+
+    // Eksekusi Mundur: Hapus posisi terakhir dari Stack (Untuk Logic Finish Turn)
+    public void revertToPreviousStep() {
+        if (stepHistory.size() > 1) {
+            stepHistory.pop(); // Hapus posisi saat ini (Undo)
+            this.position = stepHistory.peek(); // Set posisi ke data history sebelumnya
+        }
+    }
+
+    // --- [BARU] FITUR RESET SESSION ---
+    // Mengembalikan player ke posisi awal tapi TIDAK menghapus skor (Akumulasi)
+    public void resetForNewSession() {
+        this.position = 1;
+        this.stepHistory.clear();
+        this.stepHistory.push(1);
     }
 }
