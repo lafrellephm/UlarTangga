@@ -35,7 +35,7 @@ public class BoardPanel extends JPanel {
     private final int TILE_SIZE = 55;
     private final int PANEL_WIDTH = 1000;
     private final int PANEL_HEIGHT = 850;
-
+    private Random visualRandom = new Random();
     public BoardPanel() {
         setLayout(null);
         // HAPUS setPreferredSize, biarkan layout manager yang mengatur ukurannya
@@ -308,32 +308,49 @@ public class BoardPanel extends JPanel {
     }
 
     private JPanel createSquare(int number, ThemeManager.Theme theme) {
-        JPanel panel = new JPanel(new BorderLayout());
+        // 1. Tentukan Radius Acak (Variasi antara 10px hingga 25px)
+        // Memberikan efek "organik" agar tidak semua kotak terlihat seragam
+        int randomRadius = 10 + visualRandom.nextInt(16);
+
+        // 2. Gunakan Custom RoundedPanel (bukan JPanel biasa)
+        RoundedPanel panel = new RoundedPanel(randomRadius);
+        panel.setLayout(new BorderLayout());
+
+        // 3. Tentukan Warna Background (Selang-seling)
         boolean isEven = (number % 2 == 0);
         Color bgColor = isEven ? theme.tileColor1 : theme.tileColor2;
         panel.setBackground(bgColor);
 
-        // Kecerahan teks
+        // 4. Hapus Border Standar
+        // Kita tidak menggunakan LineBorder karena bentuknya kotak tajam.
+        // Border garis melengkung sudah digambar manual di dalam class RoundedPanel.
+        panel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
+
+        // 5. Hitung Kontras Warna Teks (Hitam/Putih)
+        // Rumus Luminance untuk menentukan apakah background gelap atau terang
         double brightness = (0.299 * bgColor.getRed() + 0.587 * bgColor.getGreen() + 0.114 * bgColor.getBlue()) / 255;
         boolean isDark = brightness < 0.5;
 
         Color textColor = isDark ? Color.WHITE : Color.BLACK;
-        Color borderColor = isDark ? Color.DARK_GRAY : Color.GRAY;
         Color pointColor = isDark ? Color.LIGHT_GRAY : Color.GRAY;
 
-        panel.setBorder(new LineBorder(borderColor, 1));
-
+        // 6. Label Nomor Tile (Pojok Kiri Atas)
         JLabel numLabel = new JLabel(String.valueOf(number));
         numLabel.setFont(new Font("Arial", Font.BOLD, 10));
         numLabel.setForeground(textColor);
-        numLabel.setBorder(BorderFactory.createEmptyBorder(1, 2, 0, 0));
+        // Padding agar angka tidak terlalu mepet ke pinggir lengkungan
+        numLabel.setBorder(BorderFactory.createEmptyBorder(2, 5, 0, 0));
         panel.add(numLabel, BorderLayout.NORTH);
 
+        // 7. Label Poin (Tengah Bawah) - Hanya jika ada poin
         if (tilePoints[number] > 0) {
             JLabel ptLabel = new JLabel("+" + tilePoints[number]);
-            ptLabel.setFont(new Font("Arial", Font.PLAIN, 8));
+            ptLabel.setFont(new Font("Arial", Font.PLAIN, 9)); // Ukuran font diperkecil sedikit
             ptLabel.setForeground(pointColor);
             ptLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+            // Tambahkan padding bawah agar tidak tertutup border lengkung bawah
+            ptLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 2, 0));
             panel.add(ptLabel, BorderLayout.SOUTH);
         }
 
@@ -546,6 +563,34 @@ public class BoardPanel extends JPanel {
             int stepX2 = (int) (x1Right + (x2Right - x1Right) * fraction);
             int stepY2 = (int) (y1Right + (y2Right - y1Right) * fraction);
             g2.drawLine(stepX1, stepY1, stepX2, stepY2);
+        }
+    }
+    // Kelas kustom untuk panel dengan sudut melengkung
+    private class RoundedPanel extends JPanel {
+        private int radius;
+
+        public RoundedPanel(int radius) {
+            this.radius = radius;
+            setOpaque(false); // Penting: agar sudut transparan tidak berwarna kotak
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            // Menyiapkan grafis untuk kualitas tinggi (anti-aliasing)
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            // Gambar Background Rounded
+            g2.setColor(getBackground());
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+
+            // (Opsional) Gambar Border Halus
+            g2.setColor(new Color(0, 0, 0, 50)); // Border semi-transparan
+            g2.setStroke(new BasicStroke(1f));
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
+
+            g2.dispose();
+            super.paintComponent(g); // Lanjut menggambar komponen anak (label angka, dll)
         }
     }
 }
