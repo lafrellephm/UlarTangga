@@ -12,7 +12,7 @@ public class UlarTanggaMain extends JFrame {
     private BoardPanel boardPanel;
     private JPanel rightPanelContainer;
     private CardLayout cardLayout;
-    
+
     // UI Komponen Game
     private DicePanel dicePanel;
     private PlayerAvatarPanel currentAvatarPanel;
@@ -21,7 +21,12 @@ public class UlarTanggaMain extends JFrame {
     // Setup Panel
     private JPanel setupPanel;
     private JComboBox<Integer> playerCountCombo;
+    private JComboBox<ThemeManager.Theme> themeCombo;
+
+    private JComboBox<Integer> ladderCountCombo;
+
     private JPanel namesInputPanel;
+
     private List<JTextField> nameFields;
 
     // Game Panel Components
@@ -37,8 +42,8 @@ public class UlarTanggaMain extends JFrame {
     private Random random;
     private Map<Integer, Integer> ladders;
     private final int FINISH_BONUS = 100;
-    
-    // Algoritma
+
+    private Map<String, Integer> globalScoreMap = new HashMap<>();
     private DijkstraPathFinder pathFinder;
 
     public UlarTanggaMain() {
@@ -46,12 +51,8 @@ public class UlarTanggaMain extends JFrame {
         try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception e) {}
 
         random = new Random();
-        
-        // 1. Inisialisasi Tangga Random
-        initRandomLadders();
-        
-        // 2. Inisialisasi Dijkstra
-        pathFinder = new DijkstraPathFinder(); 
+        ladders = new HashMap<>();
+        pathFinder = new DijkstraPathFinder();
 
         setSize(1200, 750);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -59,7 +60,6 @@ public class UlarTanggaMain extends JFrame {
         setLayout(new BorderLayout());
 
         boardPanel = new BoardPanel();
-        boardPanel.setLaddersMap(ladders);
         add(boardPanel, BorderLayout.CENTER);
 
         initRightPanel();
@@ -68,20 +68,21 @@ public class UlarTanggaMain extends JFrame {
         setVisible(true);
     }
 
-    private void initRandomLadders() {
+    // [MODIFIKASI] Menerima parameter jumlah tangga
+    private void initRandomLadders(int targetLadders) {
         ladders = new HashMap<>();
-        int targetLadders = 6; 
+        // int targetLadders = 6; <--- HAPUS BARIS INI (diganti parameter)
         int attempts = 0;
 
         while (ladders.size() < targetLadders && attempts < 1000) {
             attempts++;
-            int start = random.nextInt(60) + 2; 
+            int start = random.nextInt(60) + 2;
             int end = start + random.nextInt(63 - start) + 1;
-            
             if (end > 63) end = 63;
 
-            if (ladders.containsKey(start) || ladders.containsValue(start) || 
-                ladders.containsKey(end) || ladders.containsValue(end)) {
+            // Pastikan tidak menumpuk
+            if (ladders.containsKey(start) || ladders.containsValue(start) ||
+                    ladders.containsKey(end) || ladders.containsValue(end)) {
                 continue;
             }
 
@@ -90,9 +91,9 @@ public class UlarTanggaMain extends JFrame {
 
             if (rowStart != rowEnd) {
                 ladders.put(start, end);
-                System.out.println("Ladder Generated: " + start + " -> " + end);
             }
         }
+        boardPanel.setLaddersMap(ladders);
     }
 
     private void initRightPanel() {
@@ -108,7 +109,6 @@ public class UlarTanggaMain extends JFrame {
         cardLayout.show(rightPanelContainer, "SETUP");
     }
 
-    // --- SETUP PANEL ---
     private void createSetupPanel() {
         setupPanel = new JPanel(new BorderLayout());
         setupPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
@@ -120,12 +120,29 @@ public class UlarTanggaMain extends JFrame {
         JPanel formPanel = new JPanel();
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
 
-        JPanel comboPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        comboPanel.add(new JLabel("Jumlah Pemain:"));
+        JPanel playerComboPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        playerComboPanel.add(new JLabel("Jumlah Pemain:"));
         Integer[] options = {2, 3, 4};
         playerCountCombo = new JComboBox<>(options);
-        comboPanel.add(playerCountCombo);
-        formPanel.add(comboPanel);
+        playerComboPanel.add(playerCountCombo);
+        formPanel.add(playerComboPanel);
+
+        // --- 2. [BARU] Konfigurasi Jumlah Tangga ---
+        JPanel ladderComboPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        ladderComboPanel.add(new JLabel("Jumlah Tangga:"));
+        // Opsi jumlah tangga: 4, 6, 8, 10, 12
+        Integer[] ladderOptions = {4, 6, 8, 10, 12};
+        ladderCountCombo = new JComboBox<>(ladderOptions);
+        // Set default ke 6 (index 1)
+        ladderCountCombo.setSelectedIndex(1);
+        ladderComboPanel.add(ladderCountCombo);
+        formPanel.add(ladderComboPanel);
+
+        JPanel themeComboPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        themeComboPanel.add(new JLabel("Tema Board:"));
+        themeCombo = new JComboBox<>(ThemeManager.Theme.values());
+        themeComboPanel.add(themeCombo);
+        formPanel.add(themeComboPanel);
 
         formPanel.add(Box.createVerticalStrut(15));
 
@@ -137,6 +154,12 @@ public class UlarTanggaMain extends JFrame {
         playerCountCombo.addActionListener(e -> {
             int count = (int) playerCountCombo.getSelectedItem();
             updateNameFields(count);
+        });
+
+        themeCombo.addActionListener(e -> {
+            ThemeManager.Theme selected = (ThemeManager.Theme) themeCombo.getSelectedItem();
+            ThemeManager.setTheme(selected);
+            boardPanel.applyTheme();
         });
 
         formPanel.add(namesInputPanel);
@@ -169,6 +192,22 @@ public class UlarTanggaMain extends JFrame {
     }
 
     private void startGame() {
+        ThemeManager.Theme selectedTheme = (ThemeManager.Theme) themeCombo.getSelectedItem();
+        ThemeManager.setTheme(selectedTheme);
+
+        rollButton.setBackground(selectedTheme.btnBg);
+        rollButton.setForeground(selectedTheme.btnFg);
+
+        // 1. Generate Tangga Baru
+        int selectedLadderCount = (int) ladderCountCombo.getSelectedItem();
+        initRandomLadders(selectedLadderCount);
+
+        // 2. [BARU] Generate Poin Baru agar tidak kosong bekas game sebelumnya
+        boardPanel.generateNewTilePoints();
+
+        // 3. Terapkan Visual (Rebuild Board)
+        boardPanel.applyTheme();
+
         playerQueue = new LinkedList<>();
         fixedPlayerList = new ArrayList<>();
 
@@ -180,16 +219,28 @@ public class UlarTanggaMain extends JFrame {
             if (name.isEmpty()) name = "Player " + (i + 1);
 
             Player newPlayer = new Player(name, colors[i]);
+
+            if (globalScoreMap.containsKey(name)) {
+                int savedScore = globalScoreMap.get(name);
+                newPlayer.setScore(savedScore);
+            }
+
             playerQueue.add(newPlayer);
             fixedPlayerList.add(newPlayer);
         }
 
         boardPanel.updatePlayerPawns(playerQueue);
         updateScoreBoard();
-        updateTurnInfo(); 
-        logArea.setText("Game Dimulai!\nRandom Map Generated.\n----------------\n");
+        updateTurnInfo();
+
+        logArea.setText("Game Dimulai!\nTheme: " + selectedTheme.name + "\n");
+        if (!globalScoreMap.isEmpty()) {
+            logArea.append("Scoreboard dimuat (Akumulasi).\n");
+        }
+        logArea.append("----------------\n");
 
         cardLayout.show(rightPanelContainer, "GAME");
+        rollButton.setEnabled(true);
     }
 
     private void createGamePanel() {
@@ -201,7 +252,7 @@ public class UlarTanggaMain extends JFrame {
         // Panel KIRI
         JPanel leftControlPanel = new JPanel();
         leftControlPanel.setLayout(new BoxLayout(leftControlPanel, BoxLayout.Y_AXIS));
-        leftControlPanel.setPreferredSize(new Dimension(130, 0)); 
+        leftControlPanel.setPreferredSize(new Dimension(130, 0));
 
         JPanel turnInfoContainer = new JPanel(new BorderLayout());
         turnInfoContainer.setBorder(new TitledBorder(new LineBorder(Color.GRAY), "Turn"));
@@ -210,8 +261,8 @@ public class UlarTanggaMain extends JFrame {
 
         currentPlayerNameLabel = new JLabel("Player 1", SwingConstants.CENTER);
         currentPlayerNameLabel.setFont(new Font("Arial", Font.BOLD, 12));
-        
-        currentAvatarPanel = new PlayerAvatarPanel(); 
+
+        currentAvatarPanel = new PlayerAvatarPanel();
 
         turnInfoContainer.add(currentAvatarPanel, BorderLayout.CENTER);
         turnInfoContainer.add(currentPlayerNameLabel, BorderLayout.SOUTH);
@@ -219,19 +270,19 @@ public class UlarTanggaMain extends JFrame {
         dicePanel = new DicePanel();
         JPanel diceContainer = new JPanel(new FlowLayout(FlowLayout.CENTER));
         diceContainer.add(dicePanel);
-        
+
         leftControlPanel.add(turnInfoContainer);
         leftControlPanel.add(Box.createVerticalStrut(30));
         leftControlPanel.add(new JLabel("Dice Visual:"));
         leftControlPanel.add(diceContainer);
-        leftControlPanel.add(Box.createVerticalGlue()); 
+        leftControlPanel.add(Box.createVerticalGlue());
 
         // Panel KANAN
         JPanel rightInfoPanel = new JPanel(new BorderLayout());
-        
+
         JPanel topInfoPanel = new JPanel(new BorderLayout());
         JTextArea infoTxt = new JTextArea(
-                "Rules:\n1. Hijau = Maju & Dapat Poin.\n2. Merah = Mundur & 0 Poin.\n3. Dijkstra Pathfinding."
+                "Rules:\n1. Hijau = Maju.\n2. Merah = Mundur.\n3. Tangga HANYA JIKA Start = Prima."
         );
         infoTxt.setFont(new Font("Arial", Font.ITALIC, 11));
         infoTxt.setEditable(false);
@@ -264,7 +315,7 @@ public class UlarTanggaMain extends JFrame {
         rollButton.setBackground(Color.BLUE);
         rollButton.setForeground(Color.WHITE);
         rollButton.setFocusPainted(false);
-        rollButton.setPreferredSize(new Dimension(0, 50)); 
+        rollButton.setPreferredSize(new Dimension(0, 50));
         rollButton.addActionListener(e -> processTurnWithAnimation());
 
         gamePanel.add(upperSection, BorderLayout.CENTER);
@@ -282,17 +333,19 @@ public class UlarTanggaMain extends JFrame {
     private void updateScoreBoard() {
         StringBuilder sb = new StringBuilder();
         for (Player p : fixedPlayerList) {
-            sb.append(String.format("%-8s: %d\n", 
-                p.getName().length() > 8 ? p.getName().substring(0,8) : p.getName(), 
-                p.getScore()));
+            sb.append(String.format("%-8s: %d\n",
+                    p.getName().length() > 8 ? p.getName().substring(0,8) : p.getName(),
+                    p.getScore()));
         }
         scoreBoardArea.setText(sb.toString());
     }
 
     private boolean isPrime(int n) {
         if (n <= 1) return false;
-        for (int i = 2; i <= Math.sqrt(n); i++) {
-            if (n % i == 0) return false;
+        if (n == 2 || n == 3) return true;
+        if (n % 2 == 0 || n % 3 == 0) return false;
+        for (int i = 5; i * i <= n; i += 6) {
+            if (n % i == 0 || n % (i + 2) == 0) return false;
         }
         return true;
     }
@@ -301,11 +354,11 @@ public class UlarTanggaMain extends JFrame {
         rollButton.setEnabled(false);
         try { SoundUtility.playSound("dice_roll.wav"); } catch (Exception ex) {}
 
-        Player currentPlayer = playerQueue.peek(); 
+        Player currentPlayer = playerQueue.peek();
 
         int realDiceVal = random.nextInt(6) + 1;
         double chance = random.nextDouble();
-        boolean isGreen = chance < 0.7; 
+        boolean isGreen = chance < 0.7;
 
         final int totalAnimationSteps = 15;
         javax.swing.Timer diceTimer = new javax.swing.Timer(80, null);
@@ -319,16 +372,14 @@ public class UlarTanggaMain extends JFrame {
 
                 if (step >= totalAnimationSteps) {
                     diceTimer.stop();
-                    
                     dicePanel.setNumber(realDiceVal);
                     if (isGreen) {
                         dicePanel.setDiceColor(new Color(144, 238, 144));
                         try { SoundUtility.playSound("move_green.wav"); } catch(Exception ex){}
                     } else {
-                        dicePanel.setDiceColor(new Color(255, 99, 71)); 
+                        dicePanel.setDiceColor(new Color(255, 99, 71));
                         try { SoundUtility.playSound("move_red.wav"); } catch(Exception ex){}
                     }
-
                     executeMovementLogic(realDiceVal, isGreen);
                 }
             }
@@ -336,38 +387,109 @@ public class UlarTanggaMain extends JFrame {
         diceTimer.start();
     }
 
-    // --- UPDATE: LOGIKA GERAK DAN PENERUSAN STATUS WARNA DADU ---
     private void executeMovementLogic(int diceVal, boolean isGreen) {
         Player currentPlayer = playerQueue.poll();
-        
         int startPos = currentPlayer.getPosition();
         boolean startIsPrime = isPrime(startPos);
-        String direction = isGreen ? "[MAJU]" : "[MUNDUR]";
 
-        logArea.append(String.format(">> %s: Dadu %d %s\n", currentPlayer.getName(), diceVal, direction));
+        String direction = isGreen ? "[MAJU]" : "[MUNDUR - REVERSE]";
+        logArea.append(String.format(">> %s (Start: %d): Dadu %d %s\n",
+                currentPlayer.getName(), startPos, diceVal, direction));
 
-        // 1. Tentukan Titik Akhir Berdasarkan Dadu (Target Sementara)
-        int targetPos = startPos;
+        int targetPos;
+        List<Integer> movementPath = new ArrayList<>();
+
         if (isGreen) {
-            targetPos += diceVal;
-            if (targetPos > 64) targetPos = 64;
+            int ladderIntersection = -1;
+            int stepsToIntersection = 0;
+
+            // 1. Cek Interupsi Tangga (HANYA JIKA Start = Prima)
+            if (startIsPrime) {
+                // Cek setiap langkah yang akan dilewati
+                for (int i = 1; i <= diceVal; i++) {
+                    int checkPos = startPos + i;
+                    if (checkPos > 64) break;
+
+                    if (ladders.containsKey(checkPos)) {
+                        ladderIntersection = checkPos;
+                        stepsToIntersection = i;
+                        break; // Ketemu tangga, stop pengecekan
+                    }
+                }
+            }
+
+            if (ladderIntersection != -1) {
+                // SKENARIO: Start Prima & Menginjak Tangga (Baik lewat maupun pas berhenti)
+                int ladderTop = ladders.get(ladderIntersection);
+                int remainingSteps = diceVal - stepsToIntersection;
+
+                logArea.append(String.format("   [PRIME EFFECT] Start Prima (%d) -> Injak Tangga di %d -> AUTO NAIK ke %d\n",
+                        startPos, ladderIntersection, ladderTop));
+
+                // A. Jalan ke Dasar Tangga
+                List<Integer> pathToBase = pathFinder.findShortestPath(startPos, ladderIntersection);
+                movementPath.addAll(pathToBase);
+
+                // B. Visual Naik Tangga (Teleport ke Ujung)
+                movementPath.add(ladderTop);
+
+                // C. Lanjut Sisa Langkah (Jika ada)
+                if (remainingSteps > 0) {
+                    logArea.append(String.format("   [PRIME EFFECT] Lanjut sisa %d langkah dari %d\n", remainingSteps, ladderTop));
+
+                    int finalTarget = ladderTop + remainingSteps;
+                    if (finalTarget > 64) finalTarget = 64;
+
+                    List<Integer> pathRest = pathFinder.findShortestPath(ladderTop, finalTarget);
+
+                    // Hapus node pertama (ladderTop) agar tidak duplikat dengan langkah B
+                    if (!pathRest.isEmpty()) pathRest.remove(0);
+
+                    movementPath.addAll(pathRest);
+                    targetPos = finalTarget;
+                } else {
+                    targetPos = ladderTop;
+                }
+
+            } else {
+                // SKENARIO NORMAL / START TIDAK PRIMA
+                // Pemain jalan normal. Jika mendarat di dasar tangga sekalipun,
+                // DIA TIDAK AKAN NAIK karena start tidak prima (ladderIntersection tetap -1).
+                targetPos = startPos + diceVal;
+                if (targetPos > 64) targetPos = 64;
+                movementPath = pathFinder.findShortestPath(startPos, targetPos);
+
+                // Debug log untuk memastikan user tahu kenapa tidak naik tangga
+                if (ladders.containsKey(targetPos)) {
+                    logArea.append("   (Berhenti di dasar tangga " + targetPos + ", tapi Start BUKAN Prima -> Tidak naik)\n");
+                }
+            }
         } else {
-            targetPos -= 1; // Mundur 1 langkah
-            if (targetPos < 1) targetPos = 1;
+            // LOGIKA MERAH (MUNDUR)
+            targetPos = currentPlayer.getPreviousPosition();
+            if (targetPos == startPos) {
+                logArea.append("   (Masih di Start, tidak bisa mundur)\n");
+                movementPath.add(startPos);
+            } else {
+                movementPath.add(startPos);
+                movementPath.add(targetPos);
+            }
         }
 
-        // 2. Dijkstra Calculation
-        List<Integer> movementPath = pathFinder.findShortestPath(startPos, targetPos);
-        
-        final int finalDestinationCalc = targetPos; 
+        final int finalDestinationCalc = targetPos;
+        final List<Integer> animPath = movementPath;
 
         SwingWorker<Void, Integer> worker = new SwingWorker<>() {
             @Override
             protected Void doInBackground() throws Exception {
-                for (int pos : movementPath) {
-                    if (pos == startPos) continue;
-                    try { SoundUtility.playSound("step.wav"); } catch(Exception ex){}
-                    Thread.sleep(400); 
+                for (int pos : animPath) {
+                    // PERBAIKAN: Hanya delay dan bunyi jika BUKAN posisi awal
+                    if (pos != startPos) {
+                        Thread.sleep(300); // Delay antar langkah
+                        try { SoundUtility.playSound("step.wav"); } catch(Exception ex){}
+                    }
+
+                    // Publish tetap dilakukan untuk update UI (termasuk posisi awal agar sinkron)
                     publish(pos);
                 }
                 return null;
@@ -382,40 +504,29 @@ public class UlarTanggaMain extends JFrame {
 
             @Override
             protected void done() {
-                int actualFinalPos = finalDestinationCalc;
-                
-                // Cek Tangga (Hanya jika Hijau & Start Prima)
-                if (isGreen && startIsPrime && ladders.containsKey(actualFinalPos)) {
-                    int ladderDest = ladders.get(actualFinalPos);
-                    logArea.append("   (Dapat prima, rute menuju Tangga ditemukan! " + actualFinalPos + "->" + ladderDest + ")\n");
-                    actualFinalPos = ladderDest;
-                }
-                
-                // KIRIM STATUS isGreen KE finishTurn
-                finishTurn(currentPlayer, actualFinalPos, isGreen);
+                // Logika done() tetap sama seperti sebelumnya
+                finishTurn(currentPlayer, finalDestinationCalc, isGreen);
             }
         };
         worker.execute();
     }
 
-    // --- UPDATE: LOGIKA FINISH TURN (CEK POIN) ---
     private void finishTurn(Player player, int finalPos, boolean isGreen) {
-        player.setPosition(finalPos);
-
-        // LOGIKA BARU: Hanya dapat poin jika isGreen = true
         if (isGreen) {
-            int gainedPoints = boardPanel.getPointsAt(finalPos);
+            player.setPosition(finalPos);
+            int gainedPoints = boardPanel.claimPointsAt(finalPos);
             player.addScore(gainedPoints);
-            logArea.append("   Posisi Akhir: " + finalPos + " (+ " + gainedPoints + " pts)\n");
+            if (gainedPoints > 0) logArea.append("   Posisi Akhir: " + finalPos + " (Dapat +" + gainedPoints + " pts)\n");
+            else logArea.append("   Posisi Akhir: " + finalPos + "\n");
         } else {
-            // Jika merah (mundur), tidak dapat poin
-            logArea.append("   Posisi Akhir: " + finalPos + " (Mundur -> 0 Poin)\n");
+            player.revertToPreviousStep();
+            logArea.append("   Posisi Akhir: " + player.getPosition() + " (Kembali ke masa lalu)\n");
         }
 
         boardPanel.updatePlayerPawns(getAllPlayersIncluding(player));
         updateScoreBoard();
 
-        if (finalPos == 64) {
+        if (player.getPosition() == 64) {
             player.addScore(FINISH_BONUS);
             logArea.append("FINISH! Bonus +" + FINISH_BONUS + "\n");
             updateScoreBoard();
@@ -425,16 +536,15 @@ public class UlarTanggaMain extends JFrame {
             return;
         }
 
-        if (finalPos % 5 == 0) {
+        if (player.getPosition() % 5 == 0) {
             logArea.append("   [EXTRA TURN] Kelipatan 5!\n");
             JOptionPane.showMessageDialog(this, player.getName() + " dapat EXTRA TURN!");
-            playerQueue.addFirst(player); 
+            playerQueue.addFirst(player);
         } else {
             playerQueue.addLast(player);
         }
-        
-        updateTurnInfo(); 
 
+        updateTurnInfo();
         logArea.append("\n");
         logArea.setCaretPosition(logArea.getDocument().getLength());
         rollButton.setEnabled(true);
@@ -445,26 +555,37 @@ public class UlarTanggaMain extends JFrame {
                 (p1, p2) -> Integer.compare(p2.getScore(), p1.getScore())
         );
         rankingQueue.addAll(fixedPlayerList);
+        for (Player p : fixedPlayerList) {
+            globalScoreMap.put(p.getName(), p.getScore());
+        }
 
         StringBuilder msg = new StringBuilder("PERMAINAN SELESAI!\n\nLeaderboard:\n");
         int rank = 1;
         String winnerName = "";
-
         while (!rankingQueue.isEmpty()) {
             Player p = rankingQueue.poll();
             if (rank == 1) winnerName = p.getName();
-            msg.append(rank).append(". ").append(p.getName())
-                    .append(" - Skor: ").append(p.getScore()).append("\n");
+            msg.append(rank).append(". ").append(p.getName()).append(" - Skor: ").append(p.getScore()).append("\n");
             rank++;
         }
-        JOptionPane.showMessageDialog(this, msg.toString(), "Winner: " + winnerName, JOptionPane.INFORMATION_MESSAGE);
+
+        Object[] options = {"Main Lagi", "Keluar"};
+        int choice = JOptionPane.showOptionDialog(this,
+                msg.toString() + "\nApakah Anda ingin main lagi? (Skor akan diakumulasi)",
+                "Winner: " + winnerName,
+                JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
+
+        if (choice == JOptionPane.YES_OPTION) {
+            cardLayout.show(rightPanelContainer, "SETUP");
+            logArea.setText("");
+        } else {
+            System.exit(0);
+        }
     }
 
     private Queue<Player> getAllPlayersIncluding(Player current) {
         Queue<Player> all = new LinkedList<>(playerQueue);
-        if (!all.contains(current)) {
-            all.add(current);
-        }
+        if (!all.contains(current)) all.add(current);
         return all;
     }
 
@@ -472,36 +593,27 @@ public class UlarTanggaMain extends JFrame {
         SwingUtilities.invokeLater(() -> new UlarTanggaMain());
     }
 
-    // --- INNER CLASS: DIJKSTRA PATH FINDER ---
     class DijkstraPathFinder {
         public List<Integer> findShortestPath(int startNode, int endNode) {
             if (startNode == endNode) return Collections.singletonList(startNode);
-
             PriorityQueue<NodeDistance> pq = new PriorityQueue<>(Comparator.comparingInt(n -> n.distance));
             Map<Integer, Integer> distances = new HashMap<>();
             Map<Integer, Integer> previous = new HashMap<>();
             Set<Integer> visited = new HashSet<>();
-
-            for (int i = 1; i <= 64; i++) {
-                distances.put(i, Integer.MAX_VALUE);
-            }
+            for (int i = 1; i <= 64; i++) distances.put(i, Integer.MAX_VALUE);
             distances.put(startNode, 0);
             pq.add(new NodeDistance(startNode, 0));
 
             while (!pq.isEmpty()) {
                 NodeDistance current = pq.poll();
                 int u = current.node;
-
                 if (visited.contains(u)) continue;
                 visited.add(u);
-
                 if (u == endNode) break;
-
                 List<Integer> neighbors = getNeighbors(u);
-
                 for (int v : neighbors) {
                     if (!visited.contains(v)) {
-                        int newDist = distances.get(u) + 1; 
+                        int newDist = distances.get(u) + 1;
                         if (newDist < distances.get(v)) {
                             distances.put(v, newDist);
                             previous.put(v, u);
@@ -510,13 +622,9 @@ public class UlarTanggaMain extends JFrame {
                     }
                 }
             }
-
             List<Integer> path = new ArrayList<>();
             Integer crawl = endNode;
-            if (!previous.containsKey(crawl) && startNode != endNode) {
-                return path; 
-            }
-            
+            if (!previous.containsKey(crawl) && startNode != endNode) return path;
             path.add(crawl);
             while (previous.containsKey(crawl)) {
                 crawl = previous.get(crawl);
@@ -534,101 +642,8 @@ public class UlarTanggaMain extends JFrame {
         }
 
         class NodeDistance {
-            int node;
-            int distance;
-            public NodeDistance(int node, int distance) {
-                this.node = node;
-                this.distance = distance;
-            }
+            int node, distance;
+            public NodeDistance(int node, int distance) { this.node = node; this.distance = distance; }
         }
-    }
-}
-
-// --- CLASS VISUAL DADU ---
-class DicePanel extends JPanel {
-    private int number = 1;
-    private Color diceColor = Color.WHITE;
-
-    public DicePanel() {
-        setPreferredSize(new Dimension(80, 80)); 
-        setBackground(new Color(230, 230, 250));
-    }
-
-    public void setNumber(int number) {
-        this.number = number;
-        repaint();
-    }
-
-    public void setDiceColor(Color color) {
-        this.diceColor = color;
-        repaint();
-    }
-
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        Graphics2D g2 = (Graphics2D) g;
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        int w = getWidth();
-        int h = getHeight();
-        int diceSize = 50; 
-        int x = (w - diceSize) / 2;
-        int y = (h - diceSize) / 2;
-
-        g2.setColor(diceColor);
-        g2.fillRoundRect(x, y, diceSize, diceSize, 15, 15);
-        
-        g2.setColor(Color.BLACK);
-        g2.setStroke(new BasicStroke(2));
-        g2.drawRoundRect(x, y, diceSize, diceSize, 15, 15);
-
-        g2.setColor(Color.BLACK);
-        int dotSize = 8;
-        int center = diceSize / 2;
-        int q1 = diceSize / 4;
-        int q3 = diceSize * 3 / 4;
-
-        if (number % 2 != 0) drawDot(g2, x + center, y + center, dotSize);
-        if (number > 1) { drawDot(g2, x + q1, y + q1, dotSize); drawDot(g2, x + q3, y + q3, dotSize); }
-        if (number > 3) { drawDot(g2, x + q3, y + q1, dotSize); drawDot(g2, x + q1, y + q3, dotSize); }
-        if (number == 6) { drawDot(g2, x + q1, y + center, dotSize); drawDot(g2, x + q3, y + center, dotSize); }
-    }
-
-    private void drawDot(Graphics2D g2, int x, int y, int size) {
-        g2.fillOval(x - size / 2, y - size / 2, size, size);
-    }
-}
-
-// --- CLASS PLAYER AVATAR PANEL ---
-class PlayerAvatarPanel extends JPanel {
-    private Color avatarColor = Color.GRAY;
-
-    public PlayerAvatarPanel() {
-        setPreferredSize(new Dimension(50, 50));
-        setBackground(Color.WHITE); 
-    }
-
-    public void setAvatarColor(Color c) {
-        this.avatarColor = c;
-        repaint();
-    }
-
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        Graphics2D g2 = (Graphics2D) g;
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        int size = 40;
-        int x = (getWidth() - size) / 2;
-        int y = (getHeight() - size) / 2;
-
-        g2.setColor(avatarColor);
-        g2.fillRoundRect(x, y, size, size, 10, 10);
-
-        g2.setColor(Color.BLACK);
-        g2.setStroke(new BasicStroke(2));
-        g2.drawRoundRect(x, y, size, size, 10, 10);
     }
 }
