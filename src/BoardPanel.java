@@ -14,75 +14,363 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class BoardPanel extends JPanel {
-    private final int ROWS = 8;
-    private final int COLS = 8;
-    private int[][] boardMatrix = new int[ROWS][COLS];
-    private JPanel[] squarePanels = new JPanel[65];
-    private int[] tilePoints = new int[65];
+    // Logika Data
+    private final int TOTAL_TILES = 64;
+
+    // Array Koordinat (Index 1-64)
+    private Point[] tileCoords = new Point[TOTAL_TILES + 1];
+
+    // Visual Components
+    private JPanel[] squarePanels = new JPanel[TOTAL_TILES + 1];
+    private int[] tilePoints = new int[TOTAL_TILES + 1];
     private Map<Integer, Integer> laddersVisual;
 
-    // --- Variabel untuk Bos ---
+    // Aset Bos
     private Set<Integer> bossTiles = new HashSet<>();
     private Map<Integer, BufferedImage> bossImages = new HashMap<>();
 
+    private Map<ThemeManager.Theme, Image> themeBackgrounds = new HashMap<>();
+
+    // Konstanta Ukuran
+    private final int TILE_SIZE = 55;
+    private final int PANEL_WIDTH = 1000;
+    private final int PANEL_HEIGHT = 850;
+
     public BoardPanel() {
-        setLayout(new GridLayout(ROWS, COLS));
-        initMatrixData();
+        setLayout(null);
+        // HAPUS setPreferredSize, biarkan layout manager yang mengatur ukurannya
+        // setPreferredSize(new Dimension(PANEL_WIDTH, PANEL_HEIGHT));
+
+        // Hapus setBackground, karena akan tertutup gambar
+        // setBackground(new Color(20, 20, 20));
+
         initTilePoints();
-        initVisualUI();
         loadBossImages();
+        loadThemeBackgrounds(); // [BARU] Load semua background
+
+        initPathCoords();
+        initVisualUI();
     }
 
-    // Load gambar bos (pastikan ada di folder src/images/)
+    // [BARU] Method untuk memuat semua gambar background tema sekaligus
+    private void loadThemeBackgrounds() {
+        for (ThemeManager.Theme theme : ThemeManager.Theme.values()) {
+            try {
+                java.net.URL imgUrl = getClass().getResource(theme.bgImagePath);
+                if (imgUrl != null) {
+                    // Load sebagai BufferedImage
+                    BufferedImage bg = ImageIO.read(imgUrl);
+                    themeBackgrounds.put(theme, bg);
+                } else {
+                    System.err.println("Background tidak ditemukan: " + theme.bgImagePath);
+                }
+            } catch (IOException e) {
+                System.err.println("Gagal memuat background " + theme.name + ": " + e.getMessage());
+            }
+        }
+    }
+
+    // [PENTING] Override paintComponent untuk menggambar Background
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g); // Selalu panggil super terlebih dahulu
+
+        ThemeManager.Theme currentTheme = ThemeManager.getCurrentTheme();
+        if (currentTheme == null) currentTheme = ThemeManager.Theme.HELL;
+
+        Image bgImage = themeBackgrounds.get(currentTheme);
+
+        if (bgImage != null) {
+            Graphics2D g2d = (Graphics2D) g;
+            // Gambar background melar (stretch) memenuhi ukuran panel saat ini
+            g.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
+
+            // Opsional: Tambahkan overlay semi-transparan gelap agar tile lebih terbaca
+            g2d.setColor(new Color(0, 0, 0, 100)); // Hitam transparan
+            g2d.fillRect(0, 0, getWidth(), getHeight());
+        } else {
+            // Fallback jika gambar gagal load: warna solid gelap
+            g.setColor(new Color(20, 20, 20));
+            g.fillRect(0, 0, getWidth(), getHeight());
+        }
+    }
+
+    // --- PENGATURAN KOORDINAT MANUAL (PLACEHOLDER) ---
+
+    public void initPathCoords() {
+        ThemeManager.Theme theme = ThemeManager.getCurrentTheme();
+        if (theme == null) theme = ThemeManager.Theme.HELL;
+
+        // Reset array
+        for(int i=0; i<tileCoords.length; i++) tileCoords[i] = new Point(0,0);
+
+        switch (theme) {
+            case HELL:      initHellCoords(); break;
+            case JUNGLE:    initJungleCoords(); break;
+            case GRAVEYARD: initGraveyardCoords(); break;
+            case MOUNTAIN:  initMountainCoords(); break;
+            default:        initHellCoords(); break;
+        }
+    }
+
+    /**
+     * TEMA HELL (API)
+     * Silakan edit new Point(x, y) di bawah ini.
+     */
+    private void initHellCoords() {
+// --- COPY KODE DI BAWAH INI KE BoardPanel.java ---
+
+        tileCoords[1] = new Point(86, 690); tileCoords[2] = new Point(142, 681);
+        tileCoords[3] = new Point(197, 669); tileCoords[4] = new Point(252, 655);
+        tileCoords[5] = new Point(306, 638); tileCoords[6] = new Point(335, 585);
+        tileCoords[7] = new Point(321, 530); tileCoords[8] = new Point(301, 476);
+        tileCoords[9] = new Point(247, 456); tileCoords[10] = new Point(192, 431);
+        tileCoords[11] = new Point(137, 408); tileCoords[12] = new Point(115, 354);
+        tileCoords[13] = new Point(96, 299); tileCoords[14] = new Point(104, 244);
+        tileCoords[15] = new Point(124, 189); tileCoords[16] = new Point(179, 161);
+        tileCoords[17] = new Point(233, 170); tileCoords[18] = new Point(288, 188);
+        tileCoords[19] = new Point(313, 244); tileCoords[20] = new Point(331, 297);
+        tileCoords[21] = new Point(356, 350); tileCoords[22] = new Point(379, 405);
+        tileCoords[23] = new Point(402, 458); tileCoords[24] = new Point(421, 511);
+        tileCoords[25] = new Point(438, 564); tileCoords[26] = new Point(464, 617);
+        tileCoords[27] = new Point(519, 635); tileCoords[28] = new Point(573, 619);
+        tileCoords[29] = new Point(590, 564); tileCoords[30] = new Point(610, 508);
+        tileCoords[31] = new Point(597, 454); tileCoords[32] = new Point(579, 398);
+        tileCoords[33] = new Point(562, 342); tileCoords[34] = new Point(538, 288);
+        tileCoords[35] = new Point(509, 234); tileCoords[36] = new Point(480, 180);
+        tileCoords[37] = new Point(426, 160); tileCoords[38] = new Point(373, 138);
+        tileCoords[39] = new Point(357, 84); tileCoords[40] = new Point(412, 50);
+        tileCoords[41] = new Point(467, 48); tileCoords[42] = new Point(521, 48);
+        tileCoords[43] = new Point(575, 63); tileCoords[44] = new Point(600, 116);
+        tileCoords[45] = new Point(620, 171); tileCoords[46] = new Point(639, 225);
+        tileCoords[47] = new Point(655, 281); tileCoords[48] = new Point(673, 336);
+        tileCoords[49] = new Point(692, 392); tileCoords[50] = new Point(715, 444);
+        tileCoords[51] = new Point(741, 498); tileCoords[52] = new Point(797, 521);
+        tileCoords[53] = new Point(852, 500); tileCoords[54] = new Point(875, 446);
+        tileCoords[55] = new Point(888, 391); tileCoords[56] = new Point(872, 334);
+        tileCoords[57] = new Point(849, 279); tileCoords[58] = new Point(821, 223);
+        tileCoords[59] = new Point(766, 187); tileCoords[60] = new Point(740, 131);
+        tileCoords[61] = new Point(758, 77); tileCoords[62] = new Point(810, 59);
+        tileCoords[63] = new Point(865, 77); tileCoords[64] = new Point(920, 102);
+
+    }
+
+    /**
+     * TEMA JUNGLE (POHON)
+     * Silakan edit new Point(x, y) di bawah ini.
+     */
+    private void initJungleCoords() {
+// --- COPY KODE DI BAWAH INI KE BoardPanel.java ---
+
+        tileCoords[1] = new Point(80, 151); tileCoords[2] = new Point(134, 120);
+        tileCoords[3] = new Point(190, 154); tileCoords[4] = new Point(204, 208);
+        tileCoords[5] = new Point(189, 262); tileCoords[6] = new Point(210, 317);
+        tileCoords[7] = new Point(232, 370); tileCoords[8] = new Point(251, 424);
+        tileCoords[9] = new Point(260, 478); tileCoords[10] = new Point(250, 533);
+        tileCoords[11] = new Point(262, 587); tileCoords[12] = new Point(287, 641);
+        tileCoords[13] = new Point(342, 661); tileCoords[14] = new Point(396, 672);
+        tileCoords[15] = new Point(451, 685); tileCoords[16] = new Point(505, 659);
+        tileCoords[17] = new Point(521, 604); tileCoords[18] = new Point(504, 550);
+        tileCoords[19] = new Point(449, 517); tileCoords[20] = new Point(421, 464);
+        tileCoords[21] = new Point(407, 410); tileCoords[22] = new Point(390, 356);
+        tileCoords[23] = new Point(378, 302); tileCoords[24] = new Point(369, 246);
+        tileCoords[25] = new Point(383, 191); tileCoords[26] = new Point(406, 134);
+        tileCoords[27] = new Point(461, 112); tileCoords[28] = new Point(515, 92);
+        tileCoords[29] = new Point(570, 105); tileCoords[30] = new Point(604, 158);
+        tileCoords[31] = new Point(628, 214); tileCoords[32] = new Point(643, 270);
+        tileCoords[33] = new Point(659, 324); tileCoords[34] = new Point(673, 379);
+        tileCoords[35] = new Point(656, 434); tileCoords[36] = new Point(641, 489);
+        tileCoords[37] = new Point(658, 544); tileCoords[38] = new Point(675, 599);
+        tileCoords[39] = new Point(730, 617); tileCoords[40] = new Point(785, 636);
+        tileCoords[41] = new Point(840, 654); tileCoords[42] = new Point(894, 665);
+        tileCoords[43] = new Point(948, 659); tileCoords[44] = new Point(1003, 648);
+        tileCoords[45] = new Point(1028, 593); tileCoords[46] = new Point(1045, 537);
+        tileCoords[47] = new Point(1058, 482); tileCoords[48] = new Point(1052, 428);
+        tileCoords[49] = new Point(1028, 374); tileCoords[50] = new Point(973, 363);
+        tileCoords[51] = new Point(918, 375); tileCoords[52] = new Point(863, 355);
+        tileCoords[53] = new Point(808, 332); tileCoords[54] = new Point(753, 306);
+        tileCoords[55] = new Point(728, 251); tileCoords[56] = new Point(712, 196);
+        tileCoords[57] = new Point(698, 141); tileCoords[58] = new Point(718, 85);
+        tileCoords[59] = new Point(773, 67); tileCoords[60] = new Point(827, 45);
+        tileCoords[61] = new Point(881, 28); tileCoords[62] = new Point(936, 43);
+        tileCoords[63] = new Point(991, 62); tileCoords[64] = new Point(1046, 99);
+
+    }
+
+    /**
+     * TEMA GRAVEYARD (NISAN)
+     * Silakan edit new Point(x, y) di bawah ini.
+     */
+    private void initGraveyardCoords() {
+        // --- COPY KODE DI BAWAH INI KE BoardPanel.java ---
+
+        tileCoords[1] = new Point(50, 68); tileCoords[2] = new Point(106, 86);
+        tileCoords[3] = new Point(161, 64); tileCoords[4] = new Point(217, 89);
+        tileCoords[5] = new Point(272, 69); tileCoords[6] = new Point(394, 65);
+        tileCoords[7] = new Point(450, 83); tileCoords[8] = new Point(506, 62);
+        tileCoords[9] = new Point(562, 82); tileCoords[10] = new Point(672, 55);
+        tileCoords[11] = new Point(728, 74); tileCoords[12] = new Point(783, 55);
+        tileCoords[13] = new Point(874, 50); tileCoords[14] = new Point(930, 63);
+        tileCoords[15] = new Point(983, 82); tileCoords[16] = new Point(1012, 138);
+        tileCoords[17] = new Point(1028, 193); tileCoords[18] = new Point(1044, 249);
+        tileCoords[19] = new Point(1028, 304); tileCoords[20] = new Point(974, 329);
+        tileCoords[21] = new Point(917, 322); tileCoords[22] = new Point(861, 298);
+        tileCoords[23] = new Point(834, 241); tileCoords[24] = new Point(779, 221);
+        tileCoords[25] = new Point(725, 209); tileCoords[26] = new Point(670, 197);
+        tileCoords[27] = new Point(615, 205); tileCoords[28] = new Point(561, 222);
+        tileCoords[29] = new Point(476, 243); tileCoords[30] = new Point(422, 224);
+        tileCoords[31] = new Point(367, 236); tileCoords[32] = new Point(268, 236);
+        tileCoords[33] = new Point(213, 221); tileCoords[34] = new Point(158, 236);
+        tileCoords[35] = new Point(104, 258); tileCoords[36] = new Point(53, 346);
+        tileCoords[37] = new Point(66, 401); tileCoords[38] = new Point(86, 457);
+        tileCoords[39] = new Point(142, 483); tileCoords[40] = new Point(198, 466);
+        tileCoords[41] = new Point(257, 443); tileCoords[42] = new Point(312, 416);
+        tileCoords[43] = new Point(366, 390); tileCoords[44] = new Point(422, 413);
+        tileCoords[45] = new Point(477, 389); tileCoords[46] = new Point(531, 413);
+        tileCoords[47] = new Point(585, 389); tileCoords[48] = new Point(639, 410);
+        tileCoords[49] = new Point(749, 371); tileCoords[50] = new Point(804, 391);
+        tileCoords[51] = new Point(859, 409); tileCoords[52] = new Point(877, 464);
+        tileCoords[53] = new Point(858, 518); tileCoords[54] = new Point(804, 538);
+        tileCoords[55] = new Point(749, 530); tileCoords[56] = new Point(696, 541);
+        tileCoords[57] = new Point(517, 546); tileCoords[58] = new Point(490, 603);
+        tileCoords[59] = new Point(510, 658); tileCoords[60] = new Point(565, 670);
+        tileCoords[61] = new Point(621, 657); tileCoords[62] = new Point(775, 646);
+        tileCoords[63] = new Point(830, 671); tileCoords[64] = new Point(884, 653);
+
+    }
+
+    /**
+     * TEMA MOUNTAIN (GUNUNG)
+     * Silakan edit new Point(x, y) di bawah ini.
+     */
+    private void initMountainCoords() {
+        // --- COPY KODE DI BAWAH INI KE BoardPanel.java ---
+
+        tileCoords[1] = new Point(1109, 630); tileCoords[2] = new Point(1085, 576);
+        tileCoords[3] = new Point(1030, 556); tileCoords[4] = new Point(910, 602);
+        tileCoords[5] = new Point(856, 615); tileCoords[6] = new Point(803, 636);
+        tileCoords[7] = new Point(749, 650); tileCoords[8] = new Point(654, 661);
+        tileCoords[9] = new Point(599, 647); tileCoords[10] = new Point(544, 665);
+        tileCoords[11] = new Point(489, 645); tileCoords[12] = new Point(384, 624);
+        tileCoords[13] = new Point(330, 609); tileCoords[14] = new Point(275, 627);
+        tileCoords[15] = new Point(220, 608); tileCoords[16] = new Point(164, 627);
+        tileCoords[17] = new Point(70, 585); tileCoords[18] = new Point(53, 529);
+        tileCoords[19] = new Point(107, 506); tileCoords[20] = new Point(161, 494);
+        tileCoords[21] = new Point(216, 486); tileCoords[22] = new Point(271, 499);
+        tileCoords[23] = new Point(393, 516); tileCoords[24] = new Point(449, 506);
+        tileCoords[25] = new Point(504, 491); tileCoords[26] = new Point(558, 510);
+        tileCoords[27] = new Point(611, 530); tileCoords[28] = new Point(733, 525);
+        tileCoords[29] = new Point(788, 507); tileCoords[30] = new Point(843, 485);
+        tileCoords[31] = new Point(916, 422); tileCoords[32] = new Point(975, 399);
+        tileCoords[33] = new Point(1031, 376); tileCoords[34] = new Point(1087, 357);
+        tileCoords[35] = new Point(1076, 264); tileCoords[36] = new Point(1021, 238);
+        tileCoords[37] = new Point(968, 219); tileCoords[38] = new Point(912, 245);
+        tileCoords[39] = new Point(856, 274); tileCoords[40] = new Point(821, 330);
+        tileCoords[41] = new Point(790, 386); tileCoords[42] = new Point(702, 418);
+        tileCoords[43] = new Point(647, 389); tileCoords[44] = new Point(591, 365);
+        tileCoords[45] = new Point(536, 349); tileCoords[46] = new Point(450, 386);
+        tileCoords[47] = new Point(397, 397); tileCoords[48] = new Point(343, 382);
+        tileCoords[49] = new Point(289, 358); tileCoords[50] = new Point(235, 344);
+        tileCoords[51] = new Point(131, 394); tileCoords[52] = new Point(76, 373);
+        tileCoords[53] = new Point(58, 319); tileCoords[54] = new Point(84, 264);
+        tileCoords[55] = new Point(138, 243); tileCoords[56] = new Point(264, 207);
+        tileCoords[57] = new Point(320, 193); tileCoords[58] = new Point(371, 209);
+        tileCoords[59] = new Point(427, 228); tileCoords[60] = new Point(482, 246);
+        tileCoords[61] = new Point(536, 215); tileCoords[62] = new Point(591, 178);
+        tileCoords[63] = new Point(644, 143); tileCoords[64] = new Point(698, 105);
+
+    }
+
+    // --- VISUAL & RENDER (JANGAN DIUBAH) ---
+
+    public void applyTheme() {
+        removeAll();
+        initPathCoords(); // Muat ulang koordinat tema yang dipilih
+        initVisualUI();
+        revalidate();
+        repaint();
+    }
+
+    private void initVisualUI() {
+        ThemeManager.Theme theme = ThemeManager.getCurrentTheme();
+        if (theme == null) theme = ThemeManager.Theme.HELL;
+
+        for (int i = 1; i <= TOTAL_TILES; i++) {
+            JPanel square = createSquare(i, theme);
+            squarePanels[i] = square;
+            add(square);
+
+            Point p = tileCoords[i];
+            if (p != null) {
+                square.setBounds(p.x, p.y, TILE_SIZE, TILE_SIZE);
+            }
+        }
+    }
+
+    private JPanel createSquare(int number, ThemeManager.Theme theme) {
+        JPanel panel = new JPanel(new BorderLayout());
+        boolean isEven = (number % 2 == 0);
+        Color bgColor = isEven ? theme.tileColor1 : theme.tileColor2;
+        panel.setBackground(bgColor);
+
+        // Kecerahan teks
+        double brightness = (0.299 * bgColor.getRed() + 0.587 * bgColor.getGreen() + 0.114 * bgColor.getBlue()) / 255;
+        boolean isDark = brightness < 0.5;
+
+        Color textColor = isDark ? Color.WHITE : Color.BLACK;
+        Color borderColor = isDark ? Color.DARK_GRAY : Color.GRAY;
+        Color pointColor = isDark ? Color.LIGHT_GRAY : Color.GRAY;
+
+        panel.setBorder(new LineBorder(borderColor, 1));
+
+        JLabel numLabel = new JLabel(String.valueOf(number));
+        numLabel.setFont(new Font("Arial", Font.BOLD, 10));
+        numLabel.setForeground(textColor);
+        numLabel.setBorder(BorderFactory.createEmptyBorder(1, 2, 0, 0));
+        panel.add(numLabel, BorderLayout.NORTH);
+
+        if (tilePoints[number] > 0) {
+            JLabel ptLabel = new JLabel("+" + tilePoints[number]);
+            ptLabel.setFont(new Font("Arial", Font.PLAIN, 8));
+            ptLabel.setForeground(pointColor);
+            ptLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            panel.add(ptLabel, BorderLayout.SOUTH);
+        }
+
+        return panel;
+    }
+
     private void loadBossImages() {
         try {
             for (int i = 1; i <= 4; i++) {
                 java.net.URL imgUrl = getClass().getResource("/images/bos" + i + ".png");
-                if (imgUrl != null) {
-                    bossImages.put(i, ImageIO.read(imgUrl));
-                }
+                if (imgUrl != null) bossImages.put(i, ImageIO.read(imgUrl));
             }
         } catch (IOException e) {
             System.err.println("Gagal memuat gambar bos: " + e.getMessage());
         }
     }
 
-    // Generate posisi bos secara acak
     public void generateBossTiles(int count) {
         bossTiles.clear();
         Random rand = new Random();
         int attempts = 0;
-
         while (bossTiles.size() < count && attempts < 1000) {
             attempts++;
-            int pos = rand.nextInt(62) + 2; // Hindari Start(1) dan Finish(64)
-            if (!bossTiles.contains(pos)) {
-                bossTiles.add(pos);
-            }
+            int pos = rand.nextInt(62) + 2;
+            if (!bossTiles.contains(pos)) bossTiles.add(pos);
         }
         repaint();
     }
 
-    public boolean isBossTile(int pos) {
-        return bossTiles.contains(pos);
-    }
-
+    public boolean isBossTile(int pos) { return bossTiles.contains(pos); }
     private void initTilePoints() {
         Random rand = new Random();
         tilePoints[1] = 0;
-        for (int i = 2; i <= 64; i++) {
-            tilePoints[i] = (rand.nextInt(5) + 1) * 10;
-        }
+        for (int i = 2; i <= 64; i++) tilePoints[i] = (rand.nextInt(5) + 1) * 10;
     }
-
-    public void generateNewTilePoints() {
-        initTilePoints();
-    }
-
-    public int getPointsAt(int pos) {
-        if (pos >= 1 && pos <= 64) return tilePoints[pos];
-        return 0;
-    }
+    public void generateNewTilePoints() { initTilePoints(); }
+    public int getPointsAt(int pos) { return (pos >= 1 && pos <= 64) ? tilePoints[pos] : 0; }
 
     public int claimPointsAt(int pos) {
         if (pos < 1 || pos > 64) return 0;
@@ -93,11 +381,9 @@ public class BoardPanel extends JPanel {
             if (square != null) {
                 BorderLayout layout = (BorderLayout) square.getLayout();
                 Component southComp = layout.getLayoutComponent(BorderLayout.SOUTH);
-                if (southComp != null) {
-                    square.remove(southComp);
-                    square.revalidate();
-                    square.repaint();
-                }
+                if (southComp != null) square.remove(southComp);
+                square.revalidate();
+                square.repaint();
             }
         }
         return points;
@@ -108,85 +394,9 @@ public class BoardPanel extends JPanel {
         repaint();
     }
 
-    public void applyTheme() {
-        removeAll();
-        initVisualUI();
-        revalidate();
-        repaint();
-    }
-
-    private void initMatrixData() {
-        int counter = 1;
-        for (int i = ROWS - 1; i >= 0; i--) {
-            if ((ROWS - 1 - i) % 2 == 0) {
-                for (int j = 0; j < COLS; j++) {
-                    boardMatrix[i][j] = counter++;
-                }
-            } else {
-                for (int j = COLS - 1; j >= 0; j--) {
-                    boardMatrix[i][j] = counter++;
-                }
-            }
-        }
-    }
-
-    private void initVisualUI() {
-        ThemeManager.Theme theme = ThemeManager.getCurrentTheme();
-        // Fallback jika theme null
-        if (theme == null) theme = ThemeManager.Theme.HELL;
-
-        for (int i = 0; i < ROWS; i++) {
-            for (int j = 0; j < COLS; j++) {
-                int number = boardMatrix[i][j];
-                JPanel square = createSquare(number, i, j, theme);
-                squarePanels[number] = square;
-                add(square);
-            }
-        }
-    }
-
-    private JPanel createSquare(int number, int row, int col, ThemeManager.Theme theme) {
-        JPanel panel = new JPanel(new BorderLayout());
-
-        // Tentukan background tile
-        Color bgColor;
-        if ((row + col) % 2 == 0) {
-            bgColor = theme.tileColor1;
-        } else {
-            bgColor = theme.tileColor2;
-        }
-        panel.setBackground(bgColor);
-
-        // Hitung kecerahan warna (Brightness) untuk menentukan warna teks (Hitam/Putih)
-        // Rumus Luminance: 0.299*R + 0.587*G + 0.114*B
-        double brightness = (0.299 * bgColor.getRed() + 0.587 * bgColor.getGreen() + 0.114 * bgColor.getBlue()) / 255;
-        boolean isDark = brightness < 0.5;
-
-        Color textColor = isDark ? Color.WHITE : Color.BLACK;
-        Color borderColor = isDark ? Color.DARK_GRAY : Color.GRAY;
-        Color pointColor = isDark ? Color.LIGHT_GRAY : Color.GRAY;
-
-        panel.setBorder(new LineBorder(borderColor));
-
-        JLabel numLabel = new JLabel(String.valueOf(number));
-        numLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        numLabel.setForeground(textColor);
-        numLabel.setBorder(BorderFactory.createEmptyBorder(2, 5, 0, 0));
-        panel.add(numLabel, BorderLayout.NORTH);
-
-        if (tilePoints[number] > 0) {
-            JLabel ptLabel = new JLabel("+" + tilePoints[number]);
-            ptLabel.setFont(new Font("Arial", Font.PLAIN, 10));
-            ptLabel.setForeground(pointColor);
-            ptLabel.setHorizontalAlignment(SwingConstants.CENTER);
-            panel.add(ptLabel, BorderLayout.SOUTH);
-        }
-
-        return panel;
-    }
-
     public void updatePlayerPawns(Collection<Player> players) {
-        for (int i = 1; i <= 64; i++) {
+        // Hapus pawn lama
+        for (int i = 1; i <= TOTAL_TILES; i++) {
             JPanel sq = squarePanels[i];
             if (sq == null) continue;
             BorderLayout layout = (BorderLayout) sq.getLayout();
@@ -200,7 +410,7 @@ public class BoardPanel extends JPanel {
 
         Map<Integer, List<Player>> playersByPos = new HashMap<>();
         for (Player p : players) {
-            int pos = Math.max(1, Math.min(p.getPosition(), 64));
+            int pos = Math.max(1, Math.min(p.getPosition(), TOTAL_TILES));
             playersByPos.computeIfAbsent(pos, k -> new ArrayList<>()).add(p);
         }
 
@@ -209,20 +419,22 @@ public class BoardPanel extends JPanel {
             List<Player> playersAtPos = entry.getValue();
             JPanel targetSquare = squarePanels[pos];
 
-            JPanel pawnsContainer = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 2));
-            pawnsContainer.setOpaque(false);
+            if (targetSquare != null) {
+                JPanel pawnsContainer = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+                pawnsContainer.setOpaque(false);
 
-            for (Player p : playersAtPos) {
-                JPanel pawn = new JPanel();
-                pawn.setBackground(p.getColor());
-                int size = (playersAtPos.size() > 2) ? 15 : 20;
-                pawn.setPreferredSize(new Dimension(size, size));
-                pawn.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-                pawn.setToolTipText(p.getName() + " | Score: " + p.getScore());
-                pawnsContainer.add(pawn);
+                for (Player p : playersAtPos) {
+                    JPanel pawn = new JPanel();
+                    pawn.setBackground(p.getColor());
+                    int size = (playersAtPos.size() > 2) ? 10 : 15;
+                    pawn.setPreferredSize(new Dimension(size, size));
+                    pawn.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+                    pawn.setToolTipText(p.getName());
+                    pawnsContainer.add(pawn);
+                }
+                targetSquare.add(pawnsContainer, BorderLayout.CENTER);
+                targetSquare.revalidate();
             }
-            targetSquare.add(pawnsContainer, BorderLayout.CENTER);
-            targetSquare.revalidate();
         }
         repaint();
     }
@@ -230,7 +442,6 @@ public class BoardPanel extends JPanel {
     @Override
     protected void paintChildren(Graphics g) {
         super.paintChildren(g);
-
         if (laddersVisual == null || laddersVisual.isEmpty()) return;
 
         Graphics2D g2 = (Graphics2D) g.create();
@@ -239,24 +450,27 @@ public class BoardPanel extends JPanel {
         ThemeManager.Theme theme = ThemeManager.getCurrentTheme();
         if (theme == null) theme = ThemeManager.Theme.HELL;
 
-        // --- 1. GAMBAR TANGGA ---
+        // 1. GAMBAR TANGGA
         for (Map.Entry<Integer, Integer> entry : laddersVisual.entrySet()) {
             int startNode = entry.getKey();
             int endNode = entry.getValue();
+            Point p1Global = tileCoords[startNode];
+            Point p2Global = tileCoords[endNode];
 
-            JPanel pStart = squarePanels[startNode];
-            JPanel pEnd = squarePanels[endNode];
-
-            if (pStart != null && pEnd != null) {
-                Point p1 = SwingUtilities.convertPoint(pStart, pStart.getWidth()/2, pStart.getHeight()/2, this);
-                Point p2 = SwingUtilities.convertPoint(pEnd, pEnd.getWidth()/2, pEnd.getHeight()/2, this);
+            if (p1Global != null && p2Global != null) {
+                int x1 = p1Global.x + TILE_SIZE / 2;
+                int y1 = p1Global.y + TILE_SIZE / 2;
+                int x2 = p2Global.x + TILE_SIZE / 2;
+                int y2 = p2Global.y + TILE_SIZE / 2;
+                Point p1 = new Point(x1, y1);
+                Point p2 = new Point(x2, y2);
 
                 if (theme.ladderStyle == ThemeManager.LadderStyle.DOTTED) {
                     g2.setColor(theme.ladderColor);
                     Stroke dashed = new BasicStroke(4, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{9}, 0);
                     g2.setStroke(dashed);
                     g2.drawLine(p1.x, p1.y, p2.x, p2.y);
-                    int dotSize = 12;
+                    int dotSize = 10;
                     g2.setColor(theme.ladderColor.darker());
                     g2.fillOval(p1.x - dotSize/2, p1.y - dotSize/2, dotSize, dotSize);
                     g2.fillOval(p2.x - dotSize/2, p2.y - dotSize/2, dotSize, dotSize);
@@ -266,44 +480,37 @@ public class BoardPanel extends JPanel {
             }
         }
 
-        // --- 2. GAMBAR BOS ---
+        // 2. GAMBAR BOS
         int bossIndex = 0;
         for (Integer pos : bossTiles) {
-            JPanel sq = squarePanels[pos];
-            if (sq != null) {
-                Point p = SwingUtilities.convertPoint(sq, 0, 0, this);
-
-                // Rotasi gambar bos (bos1 - bos4)
+            Point pGlobal = tileCoords[pos];
+            if (pGlobal != null) {
                 int imgId = (bossIndex % 4) + 1;
                 BufferedImage img = bossImages.get(imgId);
+                int x = pGlobal.x + (TILE_SIZE - 40) / 2;
+                int y = pGlobal.y + (TILE_SIZE - 40) / 2;
 
                 if (img != null) {
-                    int x = p.x + (sq.getWidth() - 40) / 2;
-                    int y = p.y + (sq.getHeight() - 40) / 2;
                     g2.drawImage(img, x, y, 40, 40, null);
                 } else {
-                    // Fallback jika gambar bos tidak ditemukan
-                    int x = p.x + (sq.getWidth() - 30) / 2;
-                    int y = p.y + (sq.getHeight() - 30) / 2;
                     g2.setColor(Color.RED);
                     g2.fillOval(x, y, 30, 30);
                     g2.setColor(Color.WHITE);
-                    g2.setFont(new Font("Arial", Font.BOLD, 10));
-                    g2.drawString("BOSS", x + 1, y + 20);
+                    g2.setFont(new Font("Arial", Font.BOLD, 9));
+                    g2.drawString("BOSS", x + 2, y + 20);
                 }
                 bossIndex++;
             }
         }
-
         g2.dispose();
     }
 
     private void drawRealisticLadder(Graphics2D g2, Point p1, Point p2, Color color) {
-        int ladderWidth = 22;
+        int ladderWidth = 18;
         double dx = p2.x - p1.x;
         double dy = p2.y - p1.y;
         double distance = Math.sqrt(dx * dx + dy * dy);
-        int numSteps = (int) (distance / 20);
+        int numSteps = (int) (distance / 15);
         double unitX = dx / distance;
         double unitY = dy / distance;
         double perpX = -unitY * (ladderWidth / 2.0);
