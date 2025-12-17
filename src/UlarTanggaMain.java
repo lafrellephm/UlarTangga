@@ -23,7 +23,7 @@ public class UlarTanggaMain extends JFrame {
     private JComboBox<Integer> playerCountCombo;
     private JComboBox<ThemeManager.Theme> themeCombo;
     private JComboBox<Integer> ladderCountCombo;
-    private JComboBox<Integer> bossCountCombo; // [BARU] Config Bos
+    private JComboBox<Integer> bossCountCombo; // Config Bos
 
     private JPanel namesInputPanel;
     private List<JTextField> nameFields;
@@ -53,17 +53,30 @@ public class UlarTanggaMain extends JFrame {
         ladders = new HashMap<>();
         pathFinder = new DijkstraPathFinder();
 
-        setSize(1200, 750);
+        // --- SETUP WINDOW (MODIFIKASI DI SINI) ---
+
+        // 1. Pastikan dekorasi window AKTIF (agar tombol Close/Minimize terlihat)
+        setUndecorated(false);
+
+        // 2. Set agar jendela langsung MAXIMIZED (Penuhi Layar) saat dibuka
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
+
+        // 3. Matikan fitur resize agar user tidak bisa mengubah ukuran window
+        // (Ini menjaga agar koordinat board dan rasio background tidak rusak)
+        setResizable(false);
+
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
+        // Inisialisasi BoardPanel (CENTER - Mengisi sisa ruang)
         boardPanel = new BoardPanel();
         add(boardPanel, BorderLayout.CENTER);
 
+        // Inisialisasi Panel Kanan (EAST - Lebar tetap)
         initRightPanel();
         add(rightPanelContainer, BorderLayout.EAST);
 
+        // Tampilkan Window
         setVisible(true);
     }
 
@@ -94,7 +107,8 @@ public class UlarTanggaMain extends JFrame {
     private void initRightPanel() {
         cardLayout = new CardLayout();
         rightPanelContainer = new JPanel(cardLayout);
-        rightPanelContainer.setPreferredSize(new Dimension(400, 700));
+        // Set ukuran preferensi lebar tetap (350px), tinggi mengikuti layar (0)
+        rightPanelContainer.setPreferredSize(new Dimension(350, 0));
 
         createSetupPanel();
         createGamePanel();
@@ -131,7 +145,7 @@ public class UlarTanggaMain extends JFrame {
         ladderComboPanel.add(ladderCountCombo);
         formPanel.add(ladderComboPanel);
 
-        // [BARU] Config Bos
+        // Config Bos
         JPanel bossComboPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         bossComboPanel.add(new JLabel("Jumlah Bos:"));
         Integer[] bossOptions = {0, 1, 2, 3, 4};
@@ -205,7 +219,7 @@ public class UlarTanggaMain extends JFrame {
         int selectedLadderCount = (int) ladderCountCombo.getSelectedItem();
         initRandomLadders(selectedLadderCount);
 
-        // 2. [BARU] Generate Bos
+        // 2. Generate Bos
         int selectedBossCount = (int) bossCountCombo.getSelectedItem();
         boardPanel.generateBossTiles(selectedBossCount);
 
