@@ -23,7 +23,10 @@ public class UlarTanggaMain extends JFrame {
     private JComboBox<Integer> playerCountCombo;
     private JComboBox<ThemeManager.Theme> themeCombo;
 
+    private JComboBox<Integer> ladderCountCombo;
+
     private JPanel namesInputPanel;
+
     private List<JTextField> nameFields;
 
     // Game Panel Components
@@ -65,9 +68,10 @@ public class UlarTanggaMain extends JFrame {
         setVisible(true);
     }
 
-    private void initRandomLadders() {
+    // [MODIFIKASI] Menerima parameter jumlah tangga
+    private void initRandomLadders(int targetLadders) {
         ladders = new HashMap<>();
-        int targetLadders = 6;
+        // int targetLadders = 6; <--- HAPUS BARIS INI (diganti parameter)
         int attempts = 0;
 
         while (ladders.size() < targetLadders && attempts < 1000) {
@@ -76,6 +80,7 @@ public class UlarTanggaMain extends JFrame {
             int end = start + random.nextInt(63 - start) + 1;
             if (end > 63) end = 63;
 
+            // Pastikan tidak menumpuk
             if (ladders.containsKey(start) || ladders.containsValue(start) ||
                     ladders.containsKey(end) || ladders.containsValue(end)) {
                 continue;
@@ -121,6 +126,17 @@ public class UlarTanggaMain extends JFrame {
         playerCountCombo = new JComboBox<>(options);
         playerComboPanel.add(playerCountCombo);
         formPanel.add(playerComboPanel);
+
+        // --- 2. [BARU] Konfigurasi Jumlah Tangga ---
+        JPanel ladderComboPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        ladderComboPanel.add(new JLabel("Jumlah Tangga:"));
+        // Opsi jumlah tangga: 4, 6, 8, 10, 12
+        Integer[] ladderOptions = {4, 6, 8, 10, 12};
+        ladderCountCombo = new JComboBox<>(ladderOptions);
+        // Set default ke 6 (index 1)
+        ladderCountCombo.setSelectedIndex(1);
+        ladderComboPanel.add(ladderCountCombo);
+        formPanel.add(ladderComboPanel);
 
         JPanel themeComboPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         themeComboPanel.add(new JLabel("Tema Board:"));
@@ -183,7 +199,8 @@ public class UlarTanggaMain extends JFrame {
         rollButton.setForeground(selectedTheme.btnFg);
 
         // 1. Generate Tangga Baru
-        initRandomLadders();
+        int selectedLadderCount = (int) ladderCountCombo.getSelectedItem();
+        initRandomLadders(selectedLadderCount);
 
         // 2. [BARU] Generate Poin Baru agar tidak kosong bekas game sebelumnya
         boardPanel.generateNewTilePoints();
@@ -466,8 +483,13 @@ public class UlarTanggaMain extends JFrame {
             @Override
             protected Void doInBackground() throws Exception {
                 for (int pos : animPath) {
-                    if (pos != startPos) Thread.sleep(300);
-                    try { SoundUtility.playSound("step.wav"); } catch(Exception ex){}
+                    // PERBAIKAN: Hanya delay dan bunyi jika BUKAN posisi awal
+                    if (pos != startPos) {
+                        Thread.sleep(300); // Delay antar langkah
+                        try { SoundUtility.playSound("step.wav"); } catch(Exception ex){}
+                    }
+
+                    // Publish tetap dilakukan untuk update UI (termasuk posisi awal agar sinkron)
                     publish(pos);
                 }
                 return null;
@@ -482,11 +504,7 @@ public class UlarTanggaMain extends JFrame {
 
             @Override
             protected void done() {
-                // PERBAIKAN PENTING:
-                // Tidak ada lagi pengecekan "Cek Tangga Normal" di sini.
-                // Posisi akhir murni hasil kalkulasi di atas.
-                // Jika Start Tidak Prima, finalDestinationCalc adalah petak dasar tangga (tanpa naik).
-
+                // Logika done() tetap sama seperti sebelumnya
                 finishTurn(currentPlayer, finalDestinationCalc, isGreen);
             }
         };
