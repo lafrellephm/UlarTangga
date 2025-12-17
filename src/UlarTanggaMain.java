@@ -22,11 +22,10 @@ public class UlarTanggaMain extends JFrame {
     private JPanel setupPanel;
     private JComboBox<Integer> playerCountCombo;
     private JComboBox<ThemeManager.Theme> themeCombo;
-
     private JComboBox<Integer> ladderCountCombo;
+    private JComboBox<Integer> bossCountCombo; // [BARU] Config Bos
 
     private JPanel namesInputPanel;
-
     private List<JTextField> nameFields;
 
     // Game Panel Components
@@ -47,7 +46,7 @@ public class UlarTanggaMain extends JFrame {
     private DijkstraPathFinder pathFinder;
 
     public UlarTanggaMain() {
-        super("Ladder Board Game - Dijkstra Edition");
+        super("Ladder Board Game - Boss Edition");
         try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception e) {}
 
         random = new Random();
@@ -68,10 +67,8 @@ public class UlarTanggaMain extends JFrame {
         setVisible(true);
     }
 
-    // [MODIFIKASI] Menerima parameter jumlah tangga
     private void initRandomLadders(int targetLadders) {
         ladders = new HashMap<>();
-        // int targetLadders = 6; <--- HAPUS BARIS INI (diganti parameter)
         int attempts = 0;
 
         while (ladders.size() < targetLadders && attempts < 1000) {
@@ -80,7 +77,6 @@ public class UlarTanggaMain extends JFrame {
             int end = start + random.nextInt(63 - start) + 1;
             if (end > 63) end = 63;
 
-            // Pastikan tidak menumpuk
             if (ladders.containsKey(start) || ladders.containsValue(start) ||
                     ladders.containsKey(end) || ladders.containsValue(end)) {
                 continue;
@@ -88,7 +84,6 @@ public class UlarTanggaMain extends JFrame {
 
             int rowStart = (start - 1) / 8;
             int rowEnd = (end - 1) / 8;
-
             if (rowStart != rowEnd) {
                 ladders.put(start, end);
             }
@@ -127,17 +122,25 @@ public class UlarTanggaMain extends JFrame {
         playerComboPanel.add(playerCountCombo);
         formPanel.add(playerComboPanel);
 
-        // --- 2. [BARU] Konfigurasi Jumlah Tangga ---
+        // Config Tangga
         JPanel ladderComboPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         ladderComboPanel.add(new JLabel("Jumlah Tangga:"));
-        // Opsi jumlah tangga: 4, 6, 8, 10, 12
         Integer[] ladderOptions = {4, 6, 8, 10, 12};
         ladderCountCombo = new JComboBox<>(ladderOptions);
-        // Set default ke 6 (index 1)
         ladderCountCombo.setSelectedIndex(1);
         ladderComboPanel.add(ladderCountCombo);
         formPanel.add(ladderComboPanel);
 
+        // [BARU] Config Bos
+        JPanel bossComboPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        bossComboPanel.add(new JLabel("Jumlah Bos:"));
+        Integer[] bossOptions = {0, 1, 2, 3, 4};
+        bossCountCombo = new JComboBox<>(bossOptions);
+        bossCountCombo.setSelectedIndex(0);
+        bossComboPanel.add(bossCountCombo);
+        formPanel.add(bossComboPanel);
+
+        // Config Tema
         JPanel themeComboPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         themeComboPanel.add(new JLabel("Tema Board:"));
         themeCombo = new JComboBox<>(ThemeManager.Theme.values());
@@ -198,14 +201,16 @@ public class UlarTanggaMain extends JFrame {
         rollButton.setBackground(selectedTheme.btnBg);
         rollButton.setForeground(selectedTheme.btnFg);
 
-        // 1. Generate Tangga Baru
+        // 1. Generate Tangga
         int selectedLadderCount = (int) ladderCountCombo.getSelectedItem();
         initRandomLadders(selectedLadderCount);
 
-        // 2. [BARU] Generate Poin Baru agar tidak kosong bekas game sebelumnya
-        boardPanel.generateNewTilePoints();
+        // 2. [BARU] Generate Bos
+        int selectedBossCount = (int) bossCountCombo.getSelectedItem();
+        boardPanel.generateBossTiles(selectedBossCount);
 
-        // 3. Terapkan Visual (Rebuild Board)
+        // 3. Reset Poin & UI
+        boardPanel.generateNewTilePoints();
         boardPanel.applyTheme();
 
         playerQueue = new LinkedList<>();
@@ -234,6 +239,7 @@ public class UlarTanggaMain extends JFrame {
         updateTurnInfo();
 
         logArea.setText("Game Dimulai!\nTheme: " + selectedTheme.name + "\n");
+        logArea.append("Tangga: " + selectedLadderCount + ", Bos: " + selectedBossCount + "\n");
         if (!globalScoreMap.isEmpty()) {
             logArea.append("Scoreboard dimuat (Akumulasi).\n");
         }
@@ -249,7 +255,6 @@ public class UlarTanggaMain extends JFrame {
 
         JPanel upperSection = new JPanel(new BorderLayout(10, 0));
 
-        // Panel KIRI
         JPanel leftControlPanel = new JPanel();
         leftControlPanel.setLayout(new BoxLayout(leftControlPanel, BoxLayout.Y_AXIS));
         leftControlPanel.setPreferredSize(new Dimension(130, 0));
@@ -277,12 +282,11 @@ public class UlarTanggaMain extends JFrame {
         leftControlPanel.add(diceContainer);
         leftControlPanel.add(Box.createVerticalGlue());
 
-        // Panel KANAN
         JPanel rightInfoPanel = new JPanel(new BorderLayout());
 
         JPanel topInfoPanel = new JPanel(new BorderLayout());
         JTextArea infoTxt = new JTextArea(
-                "Rules:\n1. Hijau = Maju.\n2. Merah = Mundur.\n3. Tangga HANYA JIKA Start = Prima."
+                "Rules:\n1. Hijau = Maju, Merah = Mundur.\n2. Tangga HANYA JIKA Start = Prima.\n3. BOS: Tertahan sampai dapat dadu 6."
         );
         infoTxt.setFont(new Font("Arial", Font.ITALIC, 11));
         infoTxt.setEditable(false);
@@ -333,9 +337,10 @@ public class UlarTanggaMain extends JFrame {
     private void updateScoreBoard() {
         StringBuilder sb = new StringBuilder();
         for (Player p : fixedPlayerList) {
-            sb.append(String.format("%-8s: %d\n",
+            String trapped = p.isTrapped() ? " [BOSS!]" : "";
+            sb.append(String.format("%-8s: %d%s\n",
                     p.getName().length() > 8 ? p.getName().substring(0,8) : p.getName(),
-                    p.getScore()));
+                    p.getScore(), trapped));
         }
         scoreBoardArea.setText(sb.toString());
     }
@@ -359,6 +364,12 @@ public class UlarTanggaMain extends JFrame {
         int realDiceVal = random.nextInt(6) + 1;
         double chance = random.nextDouble();
         boolean isGreen = chance < 0.7;
+
+        // --- CEK STATUS BOS (TRAPPED) ---
+        if (currentPlayer.isTrapped()) {
+            logArea.append(">> " + currentPlayer.getName() + " TERTAHAN BOS! Butuh angka 6.\n");
+        }
+        // --------------------------------
 
         final int totalAnimationSteps = 15;
         javax.swing.Timer diceTimer = new javax.swing.Timer(80, null);
@@ -390,8 +401,27 @@ public class UlarTanggaMain extends JFrame {
     private void executeMovementLogic(int diceVal, boolean isGreen) {
         Player currentPlayer = playerQueue.poll();
         int startPos = currentPlayer.getPosition();
-        boolean startIsPrime = isPrime(startPos);
 
+        // --- LOGIKA 1: PEMAIN TERTAHAN BOS ---
+        if (currentPlayer.isTrapped()) {
+            logArea.append(String.format("   Status: Trapped di Tile %d. Dadu: %d\n", startPos, diceVal));
+
+            if (diceVal == 6) {
+                logArea.append("   [BOSS FIGHT] Dadu 6! BERHASIL lolos!\n");
+                // Curi Poin
+                performBossReward(currentPlayer);
+                // Bebas, tapi giliran habis (tidak jalan)
+                currentPlayer.setTrapped(false);
+                finishTurn(currentPlayer, startPos, true);
+            } else {
+                logArea.append("   [BOSS FIGHT] Gagal. Masih tertahan.\n");
+                finishTurn(currentPlayer, startPos, true);
+            }
+            return;
+        }
+
+        // --- LOGIKA 2: GERAKAN NORMAL (TERMASUK PRIMA & TANGGA) ---
+        boolean startIsPrime = isPrime(startPos);
         String direction = isGreen ? "[MAJU]" : "[MUNDUR - REVERSE]";
         logArea.append(String.format(">> %s (Start: %d): Dadu %d %s\n",
                 currentPlayer.getName(), startPos, diceVal, direction));
@@ -403,48 +433,35 @@ public class UlarTanggaMain extends JFrame {
             int ladderIntersection = -1;
             int stepsToIntersection = 0;
 
-            // 1. Cek Interupsi Tangga (HANYA JIKA Start = Prima)
             if (startIsPrime) {
-                // Cek setiap langkah yang akan dilewati
                 for (int i = 1; i <= diceVal; i++) {
                     int checkPos = startPos + i;
                     if (checkPos > 64) break;
-
                     if (ladders.containsKey(checkPos)) {
                         ladderIntersection = checkPos;
                         stepsToIntersection = i;
-                        break; // Ketemu tangga, stop pengecekan
+                        break;
                     }
                 }
             }
 
             if (ladderIntersection != -1) {
-                // SKENARIO: Start Prima & Menginjak Tangga (Baik lewat maupun pas berhenti)
                 int ladderTop = ladders.get(ladderIntersection);
                 int remainingSteps = diceVal - stepsToIntersection;
 
                 logArea.append(String.format("   [PRIME EFFECT] Start Prima (%d) -> Injak Tangga di %d -> AUTO NAIK ke %d\n",
                         startPos, ladderIntersection, ladderTop));
 
-                // A. Jalan ke Dasar Tangga
-                List<Integer> pathToBase = pathFinder.findShortestPath(startPos, ladderIntersection);
-                movementPath.addAll(pathToBase);
+                movementPath.addAll(pathFinder.findShortestPath(startPos, ladderIntersection));
+                movementPath.add(ladderTop); // Visual naik
 
-                // B. Visual Naik Tangga (Teleport ke Ujung)
-                movementPath.add(ladderTop);
-
-                // C. Lanjut Sisa Langkah (Jika ada)
                 if (remainingSteps > 0) {
                     logArea.append(String.format("   [PRIME EFFECT] Lanjut sisa %d langkah dari %d\n", remainingSteps, ladderTop));
-
                     int finalTarget = ladderTop + remainingSteps;
                     if (finalTarget > 64) finalTarget = 64;
 
                     List<Integer> pathRest = pathFinder.findShortestPath(ladderTop, finalTarget);
-
-                    // Hapus node pertama (ladderTop) agar tidak duplikat dengan langkah B
                     if (!pathRest.isEmpty()) pathRest.remove(0);
-
                     movementPath.addAll(pathRest);
                     targetPos = finalTarget;
                 } else {
@@ -452,20 +469,15 @@ public class UlarTanggaMain extends JFrame {
                 }
 
             } else {
-                // SKENARIO NORMAL / START TIDAK PRIMA
-                // Pemain jalan normal. Jika mendarat di dasar tangga sekalipun,
-                // DIA TIDAK AKAN NAIK karena start tidak prima (ladderIntersection tetap -1).
                 targetPos = startPos + diceVal;
                 if (targetPos > 64) targetPos = 64;
                 movementPath = pathFinder.findShortestPath(startPos, targetPos);
 
-                // Debug log untuk memastikan user tahu kenapa tidak naik tangga
                 if (ladders.containsKey(targetPos)) {
                     logArea.append("   (Berhenti di dasar tangga " + targetPos + ", tapi Start BUKAN Prima -> Tidak naik)\n");
                 }
             }
         } else {
-            // LOGIKA MERAH (MUNDUR)
             targetPos = currentPlayer.getPreviousPosition();
             if (targetPos == startPos) {
                 logArea.append("   (Masih di Start, tidak bisa mundur)\n");
@@ -483,13 +495,10 @@ public class UlarTanggaMain extends JFrame {
             @Override
             protected Void doInBackground() throws Exception {
                 for (int pos : animPath) {
-                    // PERBAIKAN: Hanya delay dan bunyi jika BUKAN posisi awal
                     if (pos != startPos) {
-                        Thread.sleep(300); // Delay antar langkah
+                        Thread.sleep(300);
                         try { SoundUtility.playSound("step.wav"); } catch(Exception ex){}
                     }
-
-                    // Publish tetap dilakukan untuk update UI (termasuk posisi awal agar sinkron)
                     publish(pos);
                 }
                 return null;
@@ -504,11 +513,36 @@ public class UlarTanggaMain extends JFrame {
 
             @Override
             protected void done() {
-                // Logika done() tetap sama seperti sebelumnya
+                // [BARU] CEK APAKAH MENDARAT DI BOS
+                if (boardPanel.isBossTile(finalDestinationCalc)) {
+                    logArea.append("   [DANGER] Mendarat di Tile BOS (" + finalDestinationCalc + ")!\n");
+                    logArea.append("   Anda TERTAHAN sampai mendapat dadu 6.\n");
+                    currentPlayer.setTrapped(true);
+                }
+
                 finishTurn(currentPlayer, finalDestinationCalc, isGreen);
             }
         };
         worker.execute();
+    }
+
+    // [BARU] Logika Mencuri Poin (Reward Bos)
+    private void performBossReward(Player winner) {
+        int totalStolen = 0;
+        for (Player victim : fixedPlayerList) {
+            if (victim != winner && victim.getScore() > 0) {
+                int stealAmount = victim.getScore() / 2; // 50%
+                victim.addScore(-stealAmount);
+                winner.addScore(stealAmount);
+                totalStolen += stealAmount;
+                logArea.append("   - Mencuri " + stealAmount + " pts dari " + victim.getName() + "\n");
+            }
+        }
+        if (totalStolen > 0) {
+            logArea.append("   Total curian: +" + totalStolen + " pts!\n");
+        } else {
+            logArea.append("   (Lawan tidak punya poin untuk dicuri)\n");
+        }
     }
 
     private void finishTurn(Player player, int finalPos, boolean isGreen) {
@@ -536,7 +570,7 @@ public class UlarTanggaMain extends JFrame {
             return;
         }
 
-        if (player.getPosition() % 5 == 0) {
+        if (player.getPosition() % 5 == 0 && !player.isTrapped()) {
             logArea.append("   [EXTRA TURN] Kelipatan 5!\n");
             JOptionPane.showMessageDialog(this, player.getName() + " dapat EXTRA TURN!");
             playerQueue.addFirst(player);

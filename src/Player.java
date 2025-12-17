@@ -8,6 +8,8 @@ public class Player {
     private int score; // Fitur Score
     private Stack<Integer> stepHistory;
 
+    private boolean isTrappedByBoss = false; // Status tertahan bos
+
     public Player(String name, Color color) {
         this.name = name;
         this.color = color;
@@ -15,6 +17,15 @@ public class Player {
         this.score = 0; // Score awal 0
         this.stepHistory = new Stack<>();
         this.stepHistory.push(1);
+    }
+
+    // [BARU] Getter Setter untuk status Boss Trap
+    public boolean isTrapped() {
+        return isTrappedByBoss;
+    }
+
+    public void setTrapped(boolean trapped) {
+        this.isTrappedByBoss = trapped;
     }
 
     public String getName() {
