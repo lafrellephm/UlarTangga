@@ -566,31 +566,37 @@ public class BoardPanel extends JPanel {
         }
     }
     // Kelas kustom untuk panel dengan sudut melengkung
+    // Kelas kustom untuk panel dengan sudut melengkung dan Outline Putih
     private class RoundedPanel extends JPanel {
         private int radius;
 
         public RoundedPanel(int radius) {
             this.radius = radius;
-            setOpaque(false); // Penting: agar sudut transparan tidak berwarna kotak
+            setOpaque(false); // Transparan agar bentuk non-kotak terlihat
         }
 
         @Override
         protected void paintComponent(Graphics g) {
-            // Menyiapkan grafis untuk kualitas tinggi (anti-aliasing)
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            // Gambar Background Rounded
-            g2.setColor(getBackground());
-            g2.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+            int w = getWidth();
+            int h = getHeight();
 
-            // (Opsional) Gambar Border Halus
-            g2.setColor(new Color(0, 0, 0, 50)); // Border semi-transparan
-            g2.setStroke(new BasicStroke(1f));
-            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
+            // 1. Gambar Background Tile (Warna Tema)
+            g2.setColor(getBackground());
+            g2.fillRoundRect(0, 0, w, h, radius, radius);
+
+            // 2. Gambar Outline Putih
+            g2.setColor(Color.WHITE);
+            // Ketebalan garis 2.0f agar terlihat jelas (bisa diganti 3.0f jika ingin lebih tebal)
+            g2.setStroke(new BasicStroke(2.0f));
+
+            // Menggambar garis pinggir (inset 1px agar tidak terpotong layout)
+            g2.drawRoundRect(1, 1, w - 2, h - 2, radius, radius);
 
             g2.dispose();
-            super.paintComponent(g); // Lanjut menggambar komponen anak (label angka, dll)
+            super.paintComponent(g); // Lanjut gambar angka/konten di atasnya
         }
     }
 }
