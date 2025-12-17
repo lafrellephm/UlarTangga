@@ -374,20 +374,82 @@ public class UlarTanggaMain extends JFrame {
         Player currentPlayer = playerQueue.poll();
         int startPos = currentPlayer.getPosition();
         boolean startIsPrime = isPrime(startPos);
+
         String direction = isGreen ? "[MAJU]" : "[MUNDUR - REVERSE]";
         logArea.append(String.format(">> %s (Start: %d): Dadu %d %s\n",
                 currentPlayer.getName(), startPos, diceVal, direction));
 
         int targetPos;
-        List<Integer> movementPath;
+        List<Integer> movementPath = new ArrayList<>();
 
         if (isGreen) {
-            targetPos = startPos + diceVal;
-            if (targetPos > 64) targetPos = 64;
-            movementPath = pathFinder.findShortestPath(startPos, targetPos);
+            int ladderIntersection = -1;
+            int stepsToIntersection = 0;
+
+            // 1. Cek Interupsi Tangga (HANYA JIKA Start = Prima)
+            if (startIsPrime) {
+                // Cek setiap langkah yang akan dilewati
+                for (int i = 1; i <= diceVal; i++) {
+                    int checkPos = startPos + i;
+                    if (checkPos > 64) break;
+
+                    if (ladders.containsKey(checkPos)) {
+                        ladderIntersection = checkPos;
+                        stepsToIntersection = i;
+                        break; // Ketemu tangga, stop pengecekan
+                    }
+                }
+            }
+
+            if (ladderIntersection != -1) {
+                // SKENARIO: Start Prima & Menginjak Tangga (Baik lewat maupun pas berhenti)
+                int ladderTop = ladders.get(ladderIntersection);
+                int remainingSteps = diceVal - stepsToIntersection;
+
+                logArea.append(String.format("   [PRIME EFFECT] Start Prima (%d) -> Injak Tangga di %d -> AUTO NAIK ke %d\n",
+                        startPos, ladderIntersection, ladderTop));
+
+                // A. Jalan ke Dasar Tangga
+                List<Integer> pathToBase = pathFinder.findShortestPath(startPos, ladderIntersection);
+                movementPath.addAll(pathToBase);
+
+                // B. Visual Naik Tangga (Teleport ke Ujung)
+                movementPath.add(ladderTop);
+
+                // C. Lanjut Sisa Langkah (Jika ada)
+                if (remainingSteps > 0) {
+                    logArea.append(String.format("   [PRIME EFFECT] Lanjut sisa %d langkah dari %d\n", remainingSteps, ladderTop));
+
+                    int finalTarget = ladderTop + remainingSteps;
+                    if (finalTarget > 64) finalTarget = 64;
+
+                    List<Integer> pathRest = pathFinder.findShortestPath(ladderTop, finalTarget);
+
+                    // Hapus node pertama (ladderTop) agar tidak duplikat dengan langkah B
+                    if (!pathRest.isEmpty()) pathRest.remove(0);
+
+                    movementPath.addAll(pathRest);
+                    targetPos = finalTarget;
+                } else {
+                    targetPos = ladderTop;
+                }
+
+            } else {
+                // SKENARIO NORMAL / START TIDAK PRIMA
+                // Pemain jalan normal. Jika mendarat di dasar tangga sekalipun,
+                // DIA TIDAK AKAN NAIK karena start tidak prima (ladderIntersection tetap -1).
+                targetPos = startPos + diceVal;
+                if (targetPos > 64) targetPos = 64;
+                movementPath = pathFinder.findShortestPath(startPos, targetPos);
+
+                // Debug log untuk memastikan user tahu kenapa tidak naik tangga
+                if (ladders.containsKey(targetPos)) {
+                    logArea.append("   (Berhenti di dasar tangga " + targetPos + ", tapi Start BUKAN Prima -> Tidak naik)\n");
+                }
+            }
         } else {
+            // LOGIKA MERAH (MUNDUR)
             targetPos = currentPlayer.getPreviousPosition();
-            movementPath = new ArrayList<>();
             if (targetPos == startPos) {
                 logArea.append("   (Masih di Start, tidak bisa mundur)\n");
                 movementPath.add(startPos);
@@ -397,7 +459,7 @@ public class UlarTanggaMain extends JFrame {
             }
         }
 
-        final int finalDestinationBeforeLadder = targetPos;
+        final int finalDestinationCalc = targetPos;
         final List<Integer> animPath = movementPath;
 
         SwingWorker<Void, Integer> worker = new SwingWorker<>() {
@@ -420,17 +482,12 @@ public class UlarTanggaMain extends JFrame {
 
             @Override
             protected void done() {
-                int actualFinal = finalDestinationBeforeLadder;
-                if (isGreen && ladders.containsKey(actualFinal)) {
-                    if (startIsPrime) {
-                        int ladderDest = ladders.get(actualFinal);
-                        logArea.append("   [PRIME CHECK] Start Prima (" + startPos + ") -> NAIK TANGGA ke " + ladderDest + "\n");
-                        actualFinal = ladderDest;
-                    } else {
-                        logArea.append("   [PRIME CHECK] Start (" + startPos + ") BUKAN Prima -> TIDAK BISA naik tangga.\n");
-                    }
-                }
-                finishTurn(currentPlayer, actualFinal, isGreen);
+                // PERBAIKAN PENTING:
+                // Tidak ada lagi pengecekan "Cek Tangga Normal" di sini.
+                // Posisi akhir murni hasil kalkulasi di atas.
+                // Jika Start Tidak Prima, finalDestinationCalc adalah petak dasar tangga (tanpa naik).
+
+                finishTurn(currentPlayer, finalDestinationCalc, isGreen);
             }
         };
         worker.execute();

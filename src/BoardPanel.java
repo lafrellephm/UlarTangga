@@ -32,7 +32,7 @@ public class BoardPanel extends JPanel {
         }
     }
 
-    // [BARU] Method public untuk mereset dan mengacak ulang poin papan
+    // Method public untuk mereset dan mengacak ulang poin papan
     public void generateNewTilePoints() {
         initTilePoints();
     }
@@ -196,10 +196,7 @@ public class BoardPanel extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         ThemeManager.Theme theme = ThemeManager.getCurrentTheme();
-        // Fallback theme
         if (theme == null) theme = ThemeManager.Theme.CLASSIC;
-
-        g2.setColor(theme.ladderColor);
 
         for (Map.Entry<Integer, Integer> entry : laddersVisual.entrySet()) {
             int startNode = entry.getKey();
@@ -209,37 +206,97 @@ public class BoardPanel extends JPanel {
             JPanel pEnd = squarePanels[endNode];
 
             if (pStart != null && pEnd != null) {
+                // Konversi koordinat lokal panel ke koordinat board utama
                 Point p1 = SwingUtilities.convertPoint(pStart, pStart.getWidth()/2, pStart.getHeight()/2, this);
                 Point p2 = SwingUtilities.convertPoint(pEnd, pEnd.getWidth()/2, pEnd.getHeight()/2, this);
 
+                // --- LOGIKA VISUAL BARU ---
                 if (theme.ladderStyle == ThemeManager.LadderStyle.DOTTED) {
+                    // Jika style dotted, kita buat seperti tali sederhana atau tetap garis putus
+                    g2.setColor(theme.ladderColor);
                     Stroke dashed = new BasicStroke(4, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{9}, 0);
                     g2.setStroke(dashed);
                     g2.drawLine(p1.x, p1.y, p2.x, p2.y);
-                }
-                else if (theme.ladderStyle == ThemeManager.LadderStyle.SOLID) {
-                    g2.setStroke(new BasicStroke(6, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                    g2.drawLine(p1.x, p1.y, p2.x, p2.y);
-                    g2.setStroke(new BasicStroke(2));
-                    g2.setColor(new Color(255, 255, 255, 100));
-                    g2.drawLine(p1.x, p1.y, p2.x, p2.y);
-                    g2.setColor(theme.ladderColor);
+
+                    // Tambahkan dot di ujung
+                    int dotSize = 12;
+                    g2.setColor(theme.ladderColor.darker());
+                    g2.fillOval(p1.x - dotSize/2, p1.y - dotSize/2, dotSize, dotSize);
+                    g2.fillOval(p2.x - dotSize/2, p2.y - dotSize/2, dotSize, dotSize);
                 }
                 else {
-                    g2.setStroke(new BasicStroke(4));
-                    g2.drawLine(p1.x, p1.y, p2.x, p2.y);
+                    // Untuk CLASSIC dan SOLID, gunakan visual tangga realistis (2 rel + anak tangga)
+                    drawRealisticLadder(g2, p1, p2, theme.ladderColor);
                 }
-
-                int dotSize = 10;
-                g2.setColor(new Color(220, 20, 60));
-                g2.fillOval(p1.x - dotSize/2, p1.y - dotSize/2, dotSize, dotSize);
-
-                g2.setColor(theme.ladderColor.darker());
-                g2.fillOval(p2.x - dotSize/2, p2.y - dotSize/2, dotSize, dotSize);
-
-                g2.setColor(theme.ladderColor);
             }
         }
         g2.dispose();
+    }
+
+    /**
+     * Menggambar tangga realistis dengan 2 rel samping dan anak tangga.
+     */
+    private void drawRealisticLadder(Graphics2D g2, Point p1, Point p2, Color color) {
+        int ladderWidth = 22; // Lebar tangga
+
+        double dx = p2.x - p1.x;
+        double dy = p2.y - p1.y;
+        double distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Hitung jumlah anak tangga berdasarkan panjang (tiap 20 pixel ada 1 anak tangga)
+        int numSteps = (int) (distance / 20);
+
+        // Vektor satuan
+        double unitX = dx / distance;
+        double unitY = dy / distance;
+
+        // Vektor tegak lurus (normal) untuk membuat lebar ke kiri dan kanan
+        // Normal vector (-y, x)
+        double perpX = -unitY * (ladderWidth / 2.0);
+        double perpY = unitX * (ladderWidth / 2.0);
+
+        // Hitung 4 titik sudut rel tangga
+        // Rel Kiri (Offset +perp)
+        int x1Left = (int) (p1.x + perpX);
+        int y1Left = (int) (p1.y + perpY);
+        int x2Left = (int) (p2.x + perpX);
+        int y2Left = (int) (p2.y + perpY);
+
+        // Rel Kanan (Offset -perp)
+        int x1Right = (int) (p1.x - perpX);
+        int y1Right = (int) (p1.y - perpY);
+        int x2Right = (int) (p2.x - perpX);
+        int y2Right = (int) (p2.y - perpY);
+
+        g2.setColor(color);
+        // Gambar Rel Samping (Lebih tebal)
+        g2.setStroke(new BasicStroke(4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2.drawLine(x1Left, y1Left, x2Left, y2Left);
+        g2.drawLine(x1Right, y1Right, x2Right, y2Right);
+
+        // Efek Highlight (opsional, agar terlihat 3D sedikit)
+        g2.setStroke(new BasicStroke(2));
+        g2.setColor(new Color(255, 255, 255, 60)); // Putih transparan
+        g2.drawLine(x1Left, y1Left, x2Left, y2Left);
+        g2.drawLine(x1Right, y1Right, x2Right, y2Right);
+
+        // Kembali ke warna asli untuk anak tangga
+        g2.setColor(color);
+        g2.setStroke(new BasicStroke(3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+        // Gambar Anak Tangga (Rungs)
+        for (int i = 1; i < numSteps; i++) {
+            double fraction = (double) i / numSteps;
+
+            // Interpolasi titik pada rel kiri
+            int stepX1 = (int) (x1Left + (x2Left - x1Left) * fraction);
+            int stepY1 = (int) (y1Left + (y2Left - y1Left) * fraction);
+
+            // Interpolasi titik pada rel kanan
+            int stepX2 = (int) (x1Right + (x2Right - x1Right) * fraction);
+            int stepY2 = (int) (y1Right + (y2Right - y1Right) * fraction);
+
+            g2.drawLine(stepX1, stepY1, stepX2, stepY2);
+        }
     }
 }
