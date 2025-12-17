@@ -2,34 +2,50 @@ import java.awt.*;
 
 public class ThemeManager {
 
-    // Enum untuk jenis gaya tangga
+    // Enum untuk jenis gaya tangga (digunakan oleh BoardPanel)
     public enum LadderStyle {
-        CLASSIC, // Garis simple
-        SOLID,   // Garis tebal solid
-        DOTTED   // Garis putus-putus (seperti tali)
+        CLASSIC, // Garis simple / Tulang
+        SOLID,   // Garis tebal solid / Batu / Rantai
+        DOTTED   // Garis putus-putus / Akar / Tali
     }
 
-    // Enum Tema yang tersedia
+    // Enum Tema yang disesuaikan dengan 4 Boss
     public enum Theme {
-        CLASSIC("Classic",
-                new Color(245, 245, 220), new Color(176, 224, 230), // Tiles
-                new Color(34, 139, 34), LadderStyle.CLASSIC,        // Ladder
-                new Color(70, 130, 180), Color.WHITE),              // Button
+        // 1. TEMA HELL (Nuansa Merah Gelap & Lava)
+        HELL("Hellfire Domain",
+                new Color(40, 0, 0),       // Tile 1: Merah Kehitaman
+                new Color(178, 34, 34),    // Tile 2: Firebrick Red
+                new Color(255, 140, 0),    // Ladder: Oranye Terang (Lava)
+                LadderStyle.SOLID,
+                new Color(139, 0, 0),      // Button Bg: Dark Red
+                Color.WHITE),              // Button Fg
 
-        DARK_MODE("Dark Neon",
-                new Color(60, 60, 60), new Color(80, 80, 80),
-                new Color(0, 255, 127), LadderStyle.SOLID,
-                new Color(255, 69, 0), Color.BLACK),
+        // 2. TEMA JUNGLE (Nuansa Hijau & Alam)
+        JUNGLE("Ancient Jungle",
+                new Color(34, 139, 34),    // Tile 1: Forest Green
+                new Color(144, 238, 144),  // Tile 2: Light Green
+                new Color(139, 69, 19),    // Ladder: Coklat (Kayu/Akar)
+                LadderStyle.DOTTED,        // Style Dotted (mirip akar merambat)
+                new Color(0, 100, 0),      // Button Bg: Dark Green
+                Color.WHITE),
 
-        OCEAN("Ocean Breeze",
-                new Color(224, 255, 255), new Color(135, 206, 250),
-                new Color(255, 140, 0), LadderStyle.DOTTED,
-                new Color(0, 105, 148), Color.WHITE),
+        // 3. TEMA GRAVEYARD (Nuansa Ungu Gelap & Kelabu)
+        GRAVEYARD("Haunted Graveyard",
+                new Color(47, 79, 79),     // Tile 1: Dark Slate Gray
+                new Color(72, 61, 139),    // Tile 2: Dark Slate Blue/Purple
+                new Color(220, 220, 220),  // Ladder: Putih Tulang
+                LadderStyle.CLASSIC,       // Style Classic (mirip tulang)
+                new Color(25, 25, 112),    // Button Bg: Midnight Blue
+                Color.WHITE),
 
-        WOODEN("Retro Wood",
-                new Color(222, 184, 135), new Color(139, 69, 19),
-                new Color(101, 67, 33), LadderStyle.SOLID,
-                new Color(160, 82, 45), Color.WHITE);
+        // 4. TEMA MOUNTAIN (Nuansa Batu & Tanah)
+        MOUNTAIN("Rocky Mountain",
+                new Color(105, 105, 105),  // Tile 1: Dim Gray
+                new Color(211, 211, 211),  // Tile 2: Light Gray
+                new Color(101, 67, 33),    // Ladder: Coklat Tua (Rantai/Tali Tambang)
+                LadderStyle.SOLID,
+                new Color(47, 79, 79),     // Button Bg: Dark Slate
+                Color.WHITE);
 
         public final String name;
         public final Color tileColor1;
@@ -55,7 +71,7 @@ public class ThemeManager {
         }
     }
 
-    private static Theme currentTheme = Theme.CLASSIC;
+    private static Theme currentTheme = Theme.HELL; // Default start di Hell atau Jungle
 
     public static void setTheme(Theme theme) {
         currentTheme = theme;
