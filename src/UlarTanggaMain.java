@@ -611,7 +611,7 @@ public class UlarTanggaMain extends JFrame {
                          // try { SoundUtility.playSound("move_green.wav"); } catch(Exception ex){}
                     } else {
                         dicePanel.setDiceColor(new Color(255, 99, 71));
-                        // try { SoundUtility.playSound("move_red.wav"); } catch(Exception ex){}
+                        try { SoundUtility.playSound("move_red.wav"); } catch(Exception ex){}
                     }
                     executeMovementLogic(realDiceVal, isGreen);
                 }
