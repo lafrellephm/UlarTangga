@@ -64,8 +64,10 @@ public class UlarTanggaMain extends JFrame {
 
         // Konfigurasi Window (Fullscreen)
         setUndecorated(false);
+        setSize(1280, 850);
+        setLocationRelativeTo(null);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
-        setResizable(false);
+        setResizable(true);
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
