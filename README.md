@@ -1,7 +1,6 @@
 Group 20 | ASD(C)
-
-Rafsyah Fachri Isfansyah (5026241086)
-Laurentius Lafrellio Soewandi (5026241102)
+- Rafsyah Fachri Isfansyah (5026241086)
+- Laurentius Lafrellio Soewandi (5026241102)
 
 # 🐍 Ular Tangga - Boss Edition (Java Swing)
 
