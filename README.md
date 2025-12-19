@@ -94,13 +94,3 @@ Berikut adalah penjelasan singkat mengenai kelas-kelas utama dalam proyek ini:
 6.  **Pemenang:** Pemain pertama yang mencapai tile 64 (Finish) mendapat bonus poin besar dan permainan berakhir.
 
 ---
-
-## 👨‍💻 Author
-
-Dikembangkan sebagai proyek Pemrograman Berorientasi Objek (PBO) / Java GUI.
-
-* **Developer:** [Nama Anda / Username GitHub]
-
----
-
-> *Catatan: Pastikan file aset (.png dan .wav) berada di direktori yang benar saat menjalankan program agar tidak terjadi error NullPointerException.*
