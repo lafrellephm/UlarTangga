@@ -9,12 +9,13 @@
 
 ## 📸 Screenshots
 
-*4 Theme*
-(`preview/hell.png`)
-(`preview/jungle.png`)
-(`preview/grave.png`)
-(`preview/mountain.png`)
+| Hell Theme | Jungle Theme |
+| :---: | :---: |
+| ![Hell Theme](preview/hell.png) | ![Jungle Theme](preview/jungle.png) |
 
+| Graveyard Theme | Mountain Theme |
+| :---: | :---: |
+| ![Graveyard Theme](preview/grave.png) | ![Mountain Theme](preview/mountain.png) |
 ---
 
 ## ✨ Fitur Utama
