@@ -10,10 +10,10 @@
 ## 📸 Screenshots
 
 *4 Theme*
-`preview/hell.png`
-`preview/jungle.png`
-`preview/grave.png`
-`preview/mountain.png`
+(`preview/hell.png`)
+(`preview/jungle.png`)
+(`preview/grave.png`)
+(`preview/mountain.png`)
 
 ---
 
