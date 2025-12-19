@@ -502,6 +502,8 @@ public class UlarTanggaMain extends JFrame {
     // --- GAMEPLAY LOGIC START ---
 
     private void startGame() {
+
+
         ThemeManager.Theme selectedTheme = (ThemeManager.Theme) themeCombo.getSelectedItem();
         ThemeManager.setTheme(selectedTheme);
 
@@ -606,10 +608,10 @@ public class UlarTanggaMain extends JFrame {
                     // Set warna dadu final
                     if (isGreen) {
                         dicePanel.setDiceColor(new Color(144, 238, 144));
-                        try { SoundUtility.playSound("move_green.wav"); } catch(Exception ex){}
+                         // try { SoundUtility.playSound("move_green.wav"); } catch(Exception ex){}
                     } else {
                         dicePanel.setDiceColor(new Color(255, 99, 71));
-                        try { SoundUtility.playSound("move_red.wav"); } catch(Exception ex){}
+                        // try { SoundUtility.playSound("move_red.wav"); } catch(Exception ex){}
                     }
                     executeMovementLogic(realDiceVal, isGreen);
                 }
@@ -787,19 +789,26 @@ public class UlarTanggaMain extends JFrame {
         boardPanel.updatePlayerPawns(getAllPlayersIncluding(player));
         updateScoreBoard();
 
-        // Cek Menang
+        // --- CEK MENANG ---
         if (player.getPosition() == 64) {
             player.addScore(FINISH_BONUS);
             logArea.append("FINISH! Bonus +" + FINISH_BONUS + "\n");
             updateScoreBoard();
             playerQueue.addLast(player);
-            showWinnerDialog();
+
+            // [PERBAIKAN DI SINI]
+            // Matikan tombol DULUAN sebelum menampilkan dialog
             rollButton.setEnabled(false);
             exitGameButton.setEnabled(true);
+
+            // Baru tampilkan dialog.
+            // Jika user pilih "Main Lagi", startGame() akan dipanggil di dalam sini
+            // dan akan menyalakan kembali rollButton.
+            showWinnerDialog();
             return;
         }
 
-        // Cek Extra Turn (Kelipatan 5)
+        // --- EXTRA TURN ---
         if (player.getPosition() % 5 == 0 && !player.isTrapped()) {
             logArea.append("   [EXTRA TURN] Kelipatan 5!\n");
             JOptionPane.showMessageDialog(this, player.getName() + " dapat EXTRA TURN!");
@@ -842,6 +851,7 @@ public class UlarTanggaMain extends JFrame {
                 JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
 
         if (choice == 0) {
+
             startGame();
         } else if (choice == 1) {
             cardLayout.show(rightPanelContainer, "SETUP");
