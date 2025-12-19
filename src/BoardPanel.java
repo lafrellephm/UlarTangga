@@ -1,64 +1,51 @@
 import javax.swing.*;
-import javax.swing.border.LineBorder;
 import java.awt.*;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Random;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 
 public class BoardPanel extends JPanel {
-    // Logika Data
-    private final int TOTAL_TILES = 64;
 
-    // Array Koordinat (Index 1-64)
+    // --- Data Logika ---
+    private final int TOTAL_TILES = 64;
+    private final int TILE_SIZE = 55;
+
+    // Koordinat visual untuk setiap Tile (1-64)
     private Point[] tileCoords = new Point[TOTAL_TILES + 1];
 
-    // Visual Components
-    private JPanel[] squarePanels = new JPanel[TOTAL_TILES + 1];
+    // Nilai Poin di setiap tile
     private int[] tilePoints = new int[TOTAL_TILES + 1];
+
+    // Data Visual Tangga & Bos
     private Map<Integer, Integer> laddersVisual;
-
-    // Aset Bos
     private Set<Integer> bossTiles = new HashSet<>();
+
+    // --- Komponen & Aset ---
+    private JPanel[] squarePanels = new JPanel[TOTAL_TILES + 1];
     private Map<Integer, BufferedImage> bossImages = new HashMap<>();
-
     private Map<ThemeManager.Theme, Image> themeBackgrounds = new HashMap<>();
-
-    // Konstanta Ukuran
-    private final int TILE_SIZE = 55;
-    private final int PANEL_WIDTH = 1000;
-    private final int PANEL_HEIGHT = 850;
     private Random visualRandom = new Random();
-    public BoardPanel() {
-        setLayout(null);
-        // HAPUS setPreferredSize, biarkan layout manager yang mengatur ukurannya
-        // setPreferredSize(new Dimension(PANEL_WIDTH, PANEL_HEIGHT));
 
-        // Hapus setBackground, karena akan tertutup gambar
-        // setBackground(new Color(20, 20, 20));
+    public BoardPanel() {
+        setLayout(null); // Absolute positioning agar tile bisa diatur koordinatnya
 
         initTilePoints();
         loadBossImages();
-        loadThemeBackgrounds(); // [BARU] Load semua background
+        loadThemeBackgrounds(); // Cache gambar background
 
         initPathCoords();
         initVisualUI();
     }
 
-    // [BARU] Method untuk memuat semua gambar background tema sekaligus
+    // --- Inisialisasi Aset ---
+
     private void loadThemeBackgrounds() {
         for (ThemeManager.Theme theme : ThemeManager.Theme.values()) {
             try {
                 java.net.URL imgUrl = getClass().getResource(theme.bgImagePath);
                 if (imgUrl != null) {
-                    // Load sebagai BufferedImage
                     BufferedImage bg = ImageIO.read(imgUrl);
                     themeBackgrounds.put(theme, bg);
                 } else {
@@ -70,10 +57,72 @@ public class BoardPanel extends JPanel {
         }
     }
 
-    // [PENTING] Override paintComponent untuk menggambar Background
+    private void loadBossImages() {
+        try {
+            for (int i = 1; i <= 4; i++) {
+                java.net.URL imgUrl = getClass().getResource("/images/bos" + i + ".png");
+                if (imgUrl != null) bossImages.put(i, ImageIO.read(imgUrl));
+            }
+        } catch (IOException e) {
+            System.err.println("Gagal memuat gambar bos: " + e.getMessage());
+        }
+    }
+
+    // --- Logika Game pada Board ---
+
+    // Generate poin acak untuk tile
+    private void initTilePoints() {
+        Random rand = new Random();
+        tilePoints[1] = 0; // Start tidak ada poin
+        for (int i = 2; i <= 64; i++) tilePoints[i] = (rand.nextInt(5) + 1) * 10;
+    }
+
+    public void generateNewTilePoints() { initTilePoints(); }
+
+    public int claimPointsAt(int pos) {
+        if (pos < 1 || pos > 64) return 0;
+        int points = tilePoints[pos];
+        if (points > 0) {
+            tilePoints[pos] = 0; // Poin diambil
+            // Hapus label poin dari visual tile
+            JPanel square = squarePanels[pos];
+            if (square != null) {
+                BorderLayout layout = (BorderLayout) square.getLayout();
+                Component southComp = layout.getLayoutComponent(BorderLayout.SOUTH);
+                if (southComp != null) square.remove(southComp);
+                square.revalidate();
+                square.repaint();
+            }
+        }
+        return points;
+    }
+
+    // Generate posisi bos secara acak
+    public void generateBossTiles(int count) {
+        bossTiles.clear();
+        Random rand = new Random();
+        int attempts = 0;
+        while (bossTiles.size() < count && attempts < 1000) {
+            attempts++;
+            int pos = rand.nextInt(62) + 2; // Hindari tile 1 dan 64
+            if (!bossTiles.contains(pos)) bossTiles.add(pos);
+        }
+        repaint();
+    }
+
+    public boolean isBossTile(int pos) { return bossTiles.contains(pos); }
+
+    public void setLaddersMap(Map<Integer, Integer> ladders) {
+        this.laddersVisual = ladders;
+        repaint();
+    }
+
+    // --- Logika Visual (Rendering) ---
+
+    // Override paintComponent untuk menggambar Background Image
     @Override
     protected void paintComponent(Graphics g) {
-        super.paintComponent(g); // Selalu panggil super terlebih dahulu
+        super.paintComponent(g);
 
         ThemeManager.Theme currentTheme = ThemeManager.getCurrentTheme();
         if (currentTheme == null) currentTheme = ThemeManager.Theme.HELL;
@@ -82,26 +131,276 @@ public class BoardPanel extends JPanel {
 
         if (bgImage != null) {
             Graphics2D g2d = (Graphics2D) g;
-            // Gambar background melar (stretch) memenuhi ukuran panel saat ini
+            // Stretch background memenuhi panel
             g.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
-
-            // Opsional: Tambahkan overlay semi-transparan gelap agar tile lebih terbaca
-            g2d.setColor(new Color(0, 0, 0, 100)); // Hitam transparan
+            // Overlay gelap transparan agar tile lebih kontras
+            g2d.setColor(new Color(0, 0, 0, 100));
             g2d.fillRect(0, 0, getWidth(), getHeight());
         } else {
-            // Fallback jika gambar gagal load: warna solid gelap
             g.setColor(new Color(20, 20, 20));
             g.fillRect(0, 0, getWidth(), getHeight());
         }
     }
 
-    // --- PENGATURAN KOORDINAT MANUAL (PLACEHOLDER) ---
+    // Override paintChildren untuk menggambar Tangga & Bos di atas background tapi di bawah/atas komponen
+    @Override
+    protected void paintChildren(Graphics g) {
+        super.paintChildren(g);
+        if (laddersVisual == null && bossTiles.isEmpty()) return;
+
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        ThemeManager.Theme theme = ThemeManager.getCurrentTheme();
+        if (theme == null) theme = ThemeManager.Theme.HELL;
+
+        // 1. Gambar Tangga
+        if (laddersVisual != null) {
+            for (Map.Entry<Integer, Integer> entry : laddersVisual.entrySet()) {
+                int startNode = entry.getKey();
+                int endNode = entry.getValue();
+                Point p1Global = tileCoords[startNode];
+                Point p2Global = tileCoords[endNode];
+
+                if (p1Global != null && p2Global != null) {
+                    // Hitung pusat tile
+                    Point p1 = new Point(p1Global.x + TILE_SIZE / 2, p1Global.y + TILE_SIZE / 2);
+                    Point p2 = new Point(p2Global.x + TILE_SIZE / 2, p2Global.y + TILE_SIZE / 2);
+
+                    if (theme.ladderStyle == ThemeManager.LadderStyle.DOTTED) {
+                        drawDottedLadder(g2, p1, p2, theme.ladderColor);
+                    } else {
+                        drawRealisticLadder(g2, p1, p2, theme.ladderColor);
+                    }
+                }
+            }
+        }
+
+        // 2. Gambar Bos
+        int bossIndex = 0;
+        for (Integer pos : bossTiles) {
+            Point pGlobal = tileCoords[pos];
+            if (pGlobal != null) {
+                int imgId = (bossIndex % 4) + 1;
+                BufferedImage img = bossImages.get(imgId);
+                int x = pGlobal.x + (TILE_SIZE - 40) / 2;
+                int y = pGlobal.y + (TILE_SIZE - 40) / 2;
+
+                if (img != null) {
+                    g2.drawImage(img, x, y, 40, 40, null);
+                } else {
+                    g2.setColor(Color.RED);
+                    g2.fillOval(x, y, 30, 30);
+                }
+                bossIndex++;
+            }
+        }
+        g2.dispose();
+    }
+
+    // Mengupdate posisi pion pemain di GUI
+    public void updatePlayerPawns(Collection<Player> players) {
+        // Bersihkan semua tile dari pion lama
+        for (int i = 1; i <= TOTAL_TILES; i++) {
+            JPanel sq = squarePanels[i];
+            if (sq != null) {
+                BorderLayout layout = (BorderLayout) sq.getLayout();
+                Component centerComp = layout.getLayoutComponent(BorderLayout.CENTER);
+                if (centerComp != null) sq.remove(centerComp);
+                sq.revalidate();
+                sq.repaint();
+            }
+        }
+
+        if (players == null || players.isEmpty()) return;
+
+        // Kelompokkan pemain berdasarkan posisi
+        Map<Integer, List<Player>> playersByPos = new HashMap<>();
+        for (Player p : players) {
+            int pos = Math.max(1, Math.min(p.getPosition(), TOTAL_TILES));
+            playersByPos.computeIfAbsent(pos, k -> new ArrayList<>()).add(p);
+        }
+
+        // Gambar pion baru
+        for (Map.Entry<Integer, List<Player>> entry : playersByPos.entrySet()) {
+            int pos = entry.getKey();
+            List<Player> playersAtPos = entry.getValue();
+            JPanel targetSquare = squarePanels[pos];
+
+            if (targetSquare != null) {
+                JPanel pawnsContainer = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+                pawnsContainer.setOpaque(false);
+
+                for (Player p : playersAtPos) {
+                    JPanel pawn = new JPanel();
+                    pawn.setBackground(p.getColor());
+                    int size = (playersAtPos.size() > 2) ? 10 : 15; // Kecilkan jika ramai
+                    pawn.setPreferredSize(new Dimension(size, size));
+                    pawn.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+                    pawn.setToolTipText(p.getName());
+                    pawnsContainer.add(pawn);
+                }
+                targetSquare.add(pawnsContainer, BorderLayout.CENTER);
+                targetSquare.revalidate();
+            }
+        }
+        repaint();
+    }
+
+    // --- Helper Drawing ---
+
+    private void drawDottedLadder(Graphics2D g2, Point p1, Point p2, Color color) {
+        g2.setColor(color);
+        Stroke dashed = new BasicStroke(4, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{9}, 0);
+        g2.setStroke(dashed);
+        g2.drawLine(p1.x, p1.y, p2.x, p2.y);
+        int dotSize = 10;
+        g2.setColor(color.darker());
+        g2.fillOval(p1.x - dotSize/2, p1.y - dotSize/2, dotSize, dotSize);
+        g2.fillOval(p2.x - dotSize/2, p2.y - dotSize/2, dotSize, dotSize);
+    }
+
+    private void drawRealisticLadder(Graphics2D g2, Point p1, Point p2, Color color) {
+        int ladderWidth = 18;
+        double dx = p2.x - p1.x;
+        double dy = p2.y - p1.y;
+        double distance = Math.sqrt(dx * dx + dy * dy);
+        int numSteps = (int) (distance / 15);
+
+        // Vektor tegak lurus
+        double unitX = dx / distance;
+        double unitY = dy / distance;
+        double perpX = -unitY * (ladderWidth / 2.0);
+        double perpY = unitX * (ladderWidth / 2.0);
+
+        // Koordinat Tiang Kiri & Kanan
+        int x1Left = (int) (p1.x + perpX); int y1Left = (int) (p1.y + perpY);
+        int x2Left = (int) (p2.x + perpX); int y2Left = (int) (p2.y + perpY);
+        int x1Right = (int) (p1.x - perpX); int y1Right = (int) (p1.y - perpY);
+        int x2Right = (int) (p2.x - perpX); int y2Right = (int) (p2.y - perpY);
+
+        // Gambar Tiang
+        g2.setColor(color);
+        g2.setStroke(new BasicStroke(4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2.drawLine(x1Left, y1Left, x2Left, y2Left);
+        g2.drawLine(x1Right, y1Right, x2Right, y2Right);
+
+        // Highlight Efek
+        g2.setStroke(new BasicStroke(2));
+        g2.setColor(new Color(255, 255, 255, 60));
+        g2.drawLine(x1Left, y1Left, x2Left, y2Left);
+        g2.drawLine(x1Right, y1Right, x2Right, y2Right);
+
+        // Gambar Anak Tangga
+        g2.setColor(color);
+        g2.setStroke(new BasicStroke(3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        for (int i = 1; i < numSteps; i++) {
+            double fraction = (double) i / numSteps;
+            int stepX1 = (int) (x1Left + (x2Left - x1Left) * fraction);
+            int stepY1 = (int) (y1Left + (y2Left - y1Left) * fraction);
+            int stepX2 = (int) (x1Right + (x2Right - x1Right) * fraction);
+            int stepY2 = (int) (y1Right + (y2Right - y1Right) * fraction);
+            g2.drawLine(stepX1, stepY1, stepX2, stepY2);
+        }
+    }
+
+    // --- Inisialisasi Visual Tile (RoundedPanel) ---
+
+    public void applyTheme() {
+        removeAll();
+        initPathCoords();
+        initVisualUI();
+        revalidate();
+        repaint();
+    }
+
+    private void initVisualUI() {
+        ThemeManager.Theme theme = ThemeManager.getCurrentTheme();
+        if (theme == null) theme = ThemeManager.Theme.HELL;
+
+        for (int i = 1; i <= TOTAL_TILES; i++) {
+            JPanel square = createSquare(i, theme);
+            squarePanels[i] = square;
+            add(square);
+
+            Point p = tileCoords[i];
+            if (p != null) {
+                square.setBounds(p.x, p.y, TILE_SIZE, TILE_SIZE);
+            }
+        }
+    }
+
+    private JPanel createSquare(int number, ThemeManager.Theme theme) {
+        // Buat panel rounded dengan radius acak (efek organik)
+        int randomRadius = 10 + visualRandom.nextInt(16);
+        RoundedPanel panel = new RoundedPanel(randomRadius);
+        panel.setLayout(new BorderLayout());
+
+        // Warna Selang-seling
+        boolean isEven = (number % 2 == 0);
+        Color bgColor = isEven ? theme.tileColor1 : theme.tileColor2;
+        panel.setBackground(bgColor);
+        panel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
+
+        // Teks Kontras
+        double brightness = (0.299 * bgColor.getRed() + 0.587 * bgColor.getGreen() + 0.114 * bgColor.getBlue()) / 255;
+        Color textColor = (brightness < 0.5) ? Color.WHITE : Color.BLACK;
+        Color pointColor = (brightness < 0.5) ? Color.LIGHT_GRAY : Color.GRAY;
+
+        JLabel numLabel = new JLabel(String.valueOf(number));
+        numLabel.setFont(new Font("Arial", Font.BOLD, 10));
+        numLabel.setForeground(textColor);
+        numLabel.setBorder(BorderFactory.createEmptyBorder(2, 5, 0, 0));
+        panel.add(numLabel, BorderLayout.NORTH);
+
+        // Label Poin (jika ada)
+        if (tilePoints[number] > 0) {
+            JLabel ptLabel = new JLabel("+" + tilePoints[number]);
+            ptLabel.setFont(new Font("Arial", Font.PLAIN, 9));
+            ptLabel.setForeground(pointColor);
+            ptLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            ptLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 2, 0));
+            panel.add(ptLabel, BorderLayout.SOUTH);
+        }
+
+        return panel;
+    }
+
+    // Inner Class: Panel dengan sudut melengkung & Outline Putih
+    private class RoundedPanel extends JPanel {
+        private int radius;
+
+        public RoundedPanel(int radius) {
+            this.radius = radius;
+            setOpaque(false);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int w = getWidth();
+            int h = getHeight();
+
+            g2.setColor(getBackground());
+            g2.fillRoundRect(0, 0, w, h, radius, radius);
+
+            // Outline Putih Tebal
+            g2.setColor(Color.WHITE);
+            g2.setStroke(new BasicStroke(2.0f));
+            g2.drawRoundRect(1, 1, w - 2, h - 2, radius, radius);
+
+            g2.dispose();
+            super.paintComponent(g);
+        }
+    }
+
+    // --- KOORDINAT TILE (Hardcoded untuk setiap tema) ---
 
     public void initPathCoords() {
         ThemeManager.Theme theme = ThemeManager.getCurrentTheme();
         if (theme == null) theme = ThemeManager.Theme.HELL;
-
-        // Reset array
         for(int i=0; i<tileCoords.length; i++) tileCoords[i] = new Point(0,0);
 
         switch (theme) {
@@ -113,13 +412,7 @@ public class BoardPanel extends JPanel {
         }
     }
 
-    /**
-     * TEMA HELL (API)
-     * Silakan edit new Point(x, y) di bawah ini.
-     */
     private void initHellCoords() {
-// --- COPY KODE DI BAWAH INI KE BoardPanel.java ---
-
         tileCoords[1] = new Point(86, 690); tileCoords[2] = new Point(142, 681);
         tileCoords[3] = new Point(197, 669); tileCoords[4] = new Point(252, 655);
         tileCoords[5] = new Point(306, 638); tileCoords[6] = new Point(335, 585);
@@ -152,16 +445,9 @@ public class BoardPanel extends JPanel {
         tileCoords[59] = new Point(766, 187); tileCoords[60] = new Point(740, 131);
         tileCoords[61] = new Point(758, 77); tileCoords[62] = new Point(810, 59);
         tileCoords[63] = new Point(865, 77); tileCoords[64] = new Point(920, 102);
-
     }
 
-    /**
-     * TEMA JUNGLE (POHON)
-     * Silakan edit new Point(x, y) di bawah ini.
-     */
     private void initJungleCoords() {
-// --- COPY KODE DI BAWAH INI KE BoardPanel.java ---
-
         tileCoords[1] = new Point(80, 151); tileCoords[2] = new Point(134, 120);
         tileCoords[3] = new Point(190, 154); tileCoords[4] = new Point(204, 208);
         tileCoords[5] = new Point(189, 262); tileCoords[6] = new Point(210, 317);
@@ -194,16 +480,9 @@ public class BoardPanel extends JPanel {
         tileCoords[59] = new Point(773, 67); tileCoords[60] = new Point(827, 45);
         tileCoords[61] = new Point(881, 28); tileCoords[62] = new Point(936, 43);
         tileCoords[63] = new Point(991, 62); tileCoords[64] = new Point(1046, 99);
-
     }
 
-    /**
-     * TEMA GRAVEYARD (NISAN)
-     * Silakan edit new Point(x, y) di bawah ini.
-     */
     private void initGraveyardCoords() {
-        // --- COPY KODE DI BAWAH INI KE BoardPanel.java ---
-
         tileCoords[1] = new Point(50, 68); tileCoords[2] = new Point(106, 86);
         tileCoords[3] = new Point(161, 64); tileCoords[4] = new Point(217, 89);
         tileCoords[5] = new Point(272, 69); tileCoords[6] = new Point(394, 65);
@@ -236,16 +515,9 @@ public class BoardPanel extends JPanel {
         tileCoords[59] = new Point(510, 658); tileCoords[60] = new Point(565, 670);
         tileCoords[61] = new Point(621, 657); tileCoords[62] = new Point(775, 646);
         tileCoords[63] = new Point(830, 671); tileCoords[64] = new Point(884, 653);
-
     }
 
-    /**
-     * TEMA MOUNTAIN (GUNUNG)
-     * Silakan edit new Point(x, y) di bawah ini.
-     */
     private void initMountainCoords() {
-        // --- COPY KODE DI BAWAH INI KE BoardPanel.java ---
-
         tileCoords[1] = new Point(1109, 630); tileCoords[2] = new Point(1085, 576);
         tileCoords[3] = new Point(1030, 556); tileCoords[4] = new Point(910, 602);
         tileCoords[5] = new Point(856, 615); tileCoords[6] = new Point(803, 636);
@@ -278,325 +550,5 @@ public class BoardPanel extends JPanel {
         tileCoords[59] = new Point(427, 228); tileCoords[60] = new Point(482, 246);
         tileCoords[61] = new Point(536, 215); tileCoords[62] = new Point(591, 178);
         tileCoords[63] = new Point(644, 143); tileCoords[64] = new Point(698, 105);
-
-    }
-
-    // --- VISUAL & RENDER (JANGAN DIUBAH) ---
-
-    public void applyTheme() {
-        removeAll();
-        initPathCoords(); // Muat ulang koordinat tema yang dipilih
-        initVisualUI();
-        revalidate();
-        repaint();
-    }
-
-    private void initVisualUI() {
-        ThemeManager.Theme theme = ThemeManager.getCurrentTheme();
-        if (theme == null) theme = ThemeManager.Theme.HELL;
-
-        for (int i = 1; i <= TOTAL_TILES; i++) {
-            JPanel square = createSquare(i, theme);
-            squarePanels[i] = square;
-            add(square);
-
-            Point p = tileCoords[i];
-            if (p != null) {
-                square.setBounds(p.x, p.y, TILE_SIZE, TILE_SIZE);
-            }
-        }
-    }
-
-    private JPanel createSquare(int number, ThemeManager.Theme theme) {
-        // 1. Tentukan Radius Acak (Variasi antara 10px hingga 25px)
-        // Memberikan efek "organik" agar tidak semua kotak terlihat seragam
-        int randomRadius = 10 + visualRandom.nextInt(16);
-
-        // 2. Gunakan Custom RoundedPanel (bukan JPanel biasa)
-        RoundedPanel panel = new RoundedPanel(randomRadius);
-        panel.setLayout(new BorderLayout());
-
-        // 3. Tentukan Warna Background (Selang-seling)
-        boolean isEven = (number % 2 == 0);
-        Color bgColor = isEven ? theme.tileColor1 : theme.tileColor2;
-        panel.setBackground(bgColor);
-
-        // 4. Hapus Border Standar
-        // Kita tidak menggunakan LineBorder karena bentuknya kotak tajam.
-        // Border garis melengkung sudah digambar manual di dalam class RoundedPanel.
-        panel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
-
-        // 5. Hitung Kontras Warna Teks (Hitam/Putih)
-        // Rumus Luminance untuk menentukan apakah background gelap atau terang
-        double brightness = (0.299 * bgColor.getRed() + 0.587 * bgColor.getGreen() + 0.114 * bgColor.getBlue()) / 255;
-        boolean isDark = brightness < 0.5;
-
-        Color textColor = isDark ? Color.WHITE : Color.BLACK;
-        Color pointColor = isDark ? Color.LIGHT_GRAY : Color.GRAY;
-
-        // 6. Label Nomor Tile (Pojok Kiri Atas)
-        JLabel numLabel = new JLabel(String.valueOf(number));
-        numLabel.setFont(new Font("Arial", Font.BOLD, 10));
-        numLabel.setForeground(textColor);
-        // Padding agar angka tidak terlalu mepet ke pinggir lengkungan
-        numLabel.setBorder(BorderFactory.createEmptyBorder(2, 5, 0, 0));
-        panel.add(numLabel, BorderLayout.NORTH);
-
-        // 7. Label Poin (Tengah Bawah) - Hanya jika ada poin
-        if (tilePoints[number] > 0) {
-            JLabel ptLabel = new JLabel("+" + tilePoints[number]);
-            ptLabel.setFont(new Font("Arial", Font.PLAIN, 9)); // Ukuran font diperkecil sedikit
-            ptLabel.setForeground(pointColor);
-            ptLabel.setHorizontalAlignment(SwingConstants.CENTER);
-
-            // Tambahkan padding bawah agar tidak tertutup border lengkung bawah
-            ptLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 2, 0));
-            panel.add(ptLabel, BorderLayout.SOUTH);
-        }
-
-        return panel;
-    }
-
-    private void loadBossImages() {
-        try {
-            for (int i = 1; i <= 4; i++) {
-                java.net.URL imgUrl = getClass().getResource("/images/bos" + i + ".png");
-                if (imgUrl != null) bossImages.put(i, ImageIO.read(imgUrl));
-            }
-        } catch (IOException e) {
-            System.err.println("Gagal memuat gambar bos: " + e.getMessage());
-        }
-    }
-
-    public void generateBossTiles(int count) {
-        bossTiles.clear();
-        Random rand = new Random();
-        int attempts = 0;
-        while (bossTiles.size() < count && attempts < 1000) {
-            attempts++;
-            int pos = rand.nextInt(62) + 2;
-            if (!bossTiles.contains(pos)) bossTiles.add(pos);
-        }
-        repaint();
-    }
-
-    public boolean isBossTile(int pos) { return bossTiles.contains(pos); }
-    private void initTilePoints() {
-        Random rand = new Random();
-        tilePoints[1] = 0;
-        for (int i = 2; i <= 64; i++) tilePoints[i] = (rand.nextInt(5) + 1) * 10;
-    }
-    public void generateNewTilePoints() { initTilePoints(); }
-    public int getPointsAt(int pos) { return (pos >= 1 && pos <= 64) ? tilePoints[pos] : 0; }
-
-    public int claimPointsAt(int pos) {
-        if (pos < 1 || pos > 64) return 0;
-        int points = tilePoints[pos];
-        if (points > 0) {
-            tilePoints[pos] = 0;
-            JPanel square = squarePanels[pos];
-            if (square != null) {
-                BorderLayout layout = (BorderLayout) square.getLayout();
-                Component southComp = layout.getLayoutComponent(BorderLayout.SOUTH);
-                if (southComp != null) square.remove(southComp);
-                square.revalidate();
-                square.repaint();
-            }
-        }
-        return points;
-    }
-
-    public void setLaddersMap(Map<Integer, Integer> ladders) {
-        this.laddersVisual = ladders;
-        repaint();
-    }
-
-    public void updatePlayerPawns(Collection<Player> players) {
-        // Hapus pawn lama
-        for (int i = 1; i <= TOTAL_TILES; i++) {
-            JPanel sq = squarePanels[i];
-            if (sq == null) continue;
-            BorderLayout layout = (BorderLayout) sq.getLayout();
-            Component centerComp = layout.getLayoutComponent(BorderLayout.CENTER);
-            if (centerComp != null) sq.remove(centerComp);
-            sq.revalidate();
-            sq.repaint();
-        }
-
-        if (players == null || players.isEmpty()) return;
-
-        Map<Integer, List<Player>> playersByPos = new HashMap<>();
-        for (Player p : players) {
-            int pos = Math.max(1, Math.min(p.getPosition(), TOTAL_TILES));
-            playersByPos.computeIfAbsent(pos, k -> new ArrayList<>()).add(p);
-        }
-
-        for (Map.Entry<Integer, List<Player>> entry : playersByPos.entrySet()) {
-            int pos = entry.getKey();
-            List<Player> playersAtPos = entry.getValue();
-            JPanel targetSquare = squarePanels[pos];
-
-            if (targetSquare != null) {
-                JPanel pawnsContainer = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-                pawnsContainer.setOpaque(false);
-
-                for (Player p : playersAtPos) {
-                    JPanel pawn = new JPanel();
-                    pawn.setBackground(p.getColor());
-                    int size = (playersAtPos.size() > 2) ? 10 : 15;
-                    pawn.setPreferredSize(new Dimension(size, size));
-                    pawn.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-                    pawn.setToolTipText(p.getName());
-                    pawnsContainer.add(pawn);
-                }
-                targetSquare.add(pawnsContainer, BorderLayout.CENTER);
-                targetSquare.revalidate();
-            }
-        }
-        repaint();
-    }
-
-    @Override
-    protected void paintChildren(Graphics g) {
-        super.paintChildren(g);
-        if (laddersVisual == null || laddersVisual.isEmpty()) return;
-
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        ThemeManager.Theme theme = ThemeManager.getCurrentTheme();
-        if (theme == null) theme = ThemeManager.Theme.HELL;
-
-        // 1. GAMBAR TANGGA
-        for (Map.Entry<Integer, Integer> entry : laddersVisual.entrySet()) {
-            int startNode = entry.getKey();
-            int endNode = entry.getValue();
-            Point p1Global = tileCoords[startNode];
-            Point p2Global = tileCoords[endNode];
-
-            if (p1Global != null && p2Global != null) {
-                int x1 = p1Global.x + TILE_SIZE / 2;
-                int y1 = p1Global.y + TILE_SIZE / 2;
-                int x2 = p2Global.x + TILE_SIZE / 2;
-                int y2 = p2Global.y + TILE_SIZE / 2;
-                Point p1 = new Point(x1, y1);
-                Point p2 = new Point(x2, y2);
-
-                if (theme.ladderStyle == ThemeManager.LadderStyle.DOTTED) {
-                    g2.setColor(theme.ladderColor);
-                    Stroke dashed = new BasicStroke(4, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{9}, 0);
-                    g2.setStroke(dashed);
-                    g2.drawLine(p1.x, p1.y, p2.x, p2.y);
-                    int dotSize = 10;
-                    g2.setColor(theme.ladderColor.darker());
-                    g2.fillOval(p1.x - dotSize/2, p1.y - dotSize/2, dotSize, dotSize);
-                    g2.fillOval(p2.x - dotSize/2, p2.y - dotSize/2, dotSize, dotSize);
-                } else {
-                    drawRealisticLadder(g2, p1, p2, theme.ladderColor);
-                }
-            }
-        }
-
-        // 2. GAMBAR BOS
-        int bossIndex = 0;
-        for (Integer pos : bossTiles) {
-            Point pGlobal = tileCoords[pos];
-            if (pGlobal != null) {
-                int imgId = (bossIndex % 4) + 1;
-                BufferedImage img = bossImages.get(imgId);
-                int x = pGlobal.x + (TILE_SIZE - 40) / 2;
-                int y = pGlobal.y + (TILE_SIZE - 40) / 2;
-
-                if (img != null) {
-                    g2.drawImage(img, x, y, 40, 40, null);
-                } else {
-                    g2.setColor(Color.RED);
-                    g2.fillOval(x, y, 30, 30);
-                    g2.setColor(Color.WHITE);
-                    g2.setFont(new Font("Arial", Font.BOLD, 9));
-                    g2.drawString("BOSS", x + 2, y + 20);
-                }
-                bossIndex++;
-            }
-        }
-        g2.dispose();
-    }
-
-    private void drawRealisticLadder(Graphics2D g2, Point p1, Point p2, Color color) {
-        int ladderWidth = 18;
-        double dx = p2.x - p1.x;
-        double dy = p2.y - p1.y;
-        double distance = Math.sqrt(dx * dx + dy * dy);
-        int numSteps = (int) (distance / 15);
-        double unitX = dx / distance;
-        double unitY = dy / distance;
-        double perpX = -unitY * (ladderWidth / 2.0);
-        double perpY = unitX * (ladderWidth / 2.0);
-
-        int x1Left = (int) (p1.x + perpX);
-        int y1Left = (int) (p1.y + perpY);
-        int x2Left = (int) (p2.x + perpX);
-        int y2Left = (int) (p2.y + perpY);
-
-        int x1Right = (int) (p1.x - perpX);
-        int y1Right = (int) (p1.y - perpY);
-        int x2Right = (int) (p2.x - perpX);
-        int y2Right = (int) (p2.y - perpY);
-
-        g2.setColor(color);
-        g2.setStroke(new BasicStroke(4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        g2.drawLine(x1Left, y1Left, x2Left, y2Left);
-        g2.drawLine(x1Right, y1Right, x2Right, y2Right);
-
-        g2.setStroke(new BasicStroke(2));
-        g2.setColor(new Color(255, 255, 255, 60));
-        g2.drawLine(x1Left, y1Left, x2Left, y2Left);
-        g2.drawLine(x1Right, y1Right, x2Right, y2Right);
-
-        g2.setColor(color);
-        g2.setStroke(new BasicStroke(3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-
-        for (int i = 1; i < numSteps; i++) {
-            double fraction = (double) i / numSteps;
-            int stepX1 = (int) (x1Left + (x2Left - x1Left) * fraction);
-            int stepY1 = (int) (y1Left + (y2Left - y1Left) * fraction);
-            int stepX2 = (int) (x1Right + (x2Right - x1Right) * fraction);
-            int stepY2 = (int) (y1Right + (y2Right - y1Right) * fraction);
-            g2.drawLine(stepX1, stepY1, stepX2, stepY2);
-        }
-    }
-    // Kelas kustom untuk panel dengan sudut melengkung
-    // Kelas kustom untuk panel dengan sudut melengkung dan Outline Putih
-    private class RoundedPanel extends JPanel {
-        private int radius;
-
-        public RoundedPanel(int radius) {
-            this.radius = radius;
-            setOpaque(false); // Transparan agar bentuk non-kotak terlihat
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            int w = getWidth();
-            int h = getHeight();
-
-            // 1. Gambar Background Tile (Warna Tema)
-            g2.setColor(getBackground());
-            g2.fillRoundRect(0, 0, w, h, radius, radius);
-
-            // 2. Gambar Outline Putih
-            g2.setColor(Color.WHITE);
-            // Ketebalan garis 2.0f agar terlihat jelas (bisa diganti 3.0f jika ingin lebih tebal)
-            g2.setStroke(new BasicStroke(2.0f));
-
-            // Menggambar garis pinggir (inset 1px agar tidak terpotong layout)
-            g2.drawRoundRect(1, 1, w - 2, h - 2, radius, radius);
-
-            g2.dispose();
-            super.paintComponent(g); // Lanjut gambar angka/konten di atasnya
-        }
     }
 }
