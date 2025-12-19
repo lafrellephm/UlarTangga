@@ -1,8 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
 
-// --- CLASS PLAYER AVATAR PANEL ---
-class PlayerAvatarPanel extends JPanel {
+public class PlayerAvatarPanel extends JPanel {
     private Color avatarColor = Color.GRAY;
 
     public PlayerAvatarPanel() {
@@ -25,6 +24,7 @@ class PlayerAvatarPanel extends JPanel {
         int x = (getWidth() - size) / 2;
         int y = (getHeight() - size) / 2;
 
+        // Gambar kotak avatar sederhana
         g2.setColor(avatarColor);
         g2.fillRoundRect(x, y, size, size, 10, 10);
 

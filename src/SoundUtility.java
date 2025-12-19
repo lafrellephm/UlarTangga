@@ -4,14 +4,15 @@ import java.net.URL;
 
 public class SoundUtility {
 
+    /**
+     * Memutar file suara (.wav) dari folder resources/sound.
+     * Dijalankan di thread baru agar tidak mengganggu UI.
+     */
     public static void playSound(String filename) {
         new Thread(() -> {
             try {
-                // Menggunakan Resource Loading (Classpath)
-                // Path dimulai dengan "/" yang berarti root dari folder src (atau folder output classes)
+                // Path relatif terhadap root source (src)
                 String path = "/sound/" + filename;
-
-                // Mengambil URL file dari classpath
                 URL soundURL = SoundUtility.class.getResource(path);
 
                 if (soundURL == null) {
@@ -19,6 +20,7 @@ public class SoundUtility {
                     return;
                 }
 
+                // Setup Audio Stream
                 AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundURL);
                 Clip clip = AudioSystem.getClip();
                 clip.open(audioStream);

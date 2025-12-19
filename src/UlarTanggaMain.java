@@ -8,12 +8,12 @@ import javax.swing.border.TitledBorder;
 
 public class UlarTanggaMain extends JFrame {
 
-    // --- MAIN UI ---
+    // --- Main UI Components ---
     private BoardPanel boardPanel;
     private JPanel rightPanelContainer;
     private CardLayout cardLayout;
 
-    // --- UI SETUP PANEL COMPONENTS ---
+    // --- Setup Panel Components ---
     private JPanel setupPanel;
     private JPanel formPanel;
     private JLabel titleLabel;
@@ -27,7 +27,7 @@ public class UlarTanggaMain extends JFrame {
     private JPanel namesInputPanel;
     private List<JTextField> nameFields;
 
-    // --- UI GAME PANEL COMPONENTS ---
+    // --- Game Dashboard Components ---
     private JPanel gamePanel;
     private JPanel leftControlPanel;
     private JPanel rightInfoPanel;
@@ -38,23 +38,22 @@ public class UlarTanggaMain extends JFrame {
     private PlayerAvatarPanel currentAvatarPanel;
     private JLabel currentPlayerNameLabel;
 
-    private JTextArea infoTxt;
-    private JTextArea logArea;
-    private JTextArea scoreBoardArea;
+    private JTextArea infoTxt; // Rules Text
+    private JTextArea logArea; // Log Permainan
+    private JTextArea scoreBoardArea; // Scoreboard
     private JButton rollButton;
-    private JButton exitGameButton; // [BARU] Tombol Exit Adventure
+    private JButton exitGameButton;
 
-    // --- LOGIC DATA ---
+    // --- Game Logic Data ---
     private Deque<Player> playerQueue;
     private List<Player> fixedPlayerList;
-
     private Random random;
     private Map<Integer, Integer> ladders;
     private final int FINISH_BONUS = 100;
-
     private Map<String, Integer> globalScoreMap = new HashMap<>();
     private DijkstraPathFinder pathFinder;
 
+    // --- Constructor & Window Setup ---
     public UlarTanggaMain() {
         super("Ladder Board Game - Boss Edition");
         try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception e) {}
@@ -63,7 +62,7 @@ public class UlarTanggaMain extends JFrame {
         ladders = new HashMap<>();
         pathFinder = new DijkstraPathFinder();
 
-        // --- WINDOW SETUP ---
+        // Konfigurasi Window (Fullscreen)
         setUndecorated(false);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setResizable(false);
@@ -71,18 +70,18 @@ public class UlarTanggaMain extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // CENTER: Board Panel
+        // Center: Papan Permainan
         boardPanel = new BoardPanel();
         add(boardPanel, BorderLayout.CENTER);
 
-        // EAST: Right Panel
+        // East: Panel Kontrol (Setup/Game)
         initRightPanel();
         add(rightPanelContainer, BorderLayout.EAST);
 
         setVisible(true);
     }
 
-    // --- INITIALIZATION ---
+    // --- Initialization Methods ---
 
     private void initRightPanel() {
         cardLayout = new CardLayout();
@@ -100,11 +99,14 @@ public class UlarTanggaMain extends JFrame {
     private void initRandomLadders(int targetLadders) {
         ladders = new HashMap<>();
         int attempts = 0;
+        // Generate tangga acak (Start < End)
         while (ladders.size() < targetLadders && attempts < 1000) {
             attempts++;
             int start = random.nextInt(60) + 2;
             int end = start + random.nextInt(63 - start) + 1;
             if (end > 63) end = 63;
+
+            // Pastikan tidak tumpang tindih
             if (ladders.containsKey(start) || ladders.containsValue(start) ||
                     ladders.containsKey(end) || ladders.containsValue(end)) {
                 continue;
@@ -116,12 +118,13 @@ public class UlarTanggaMain extends JFrame {
         boardPanel.setLaddersMap(ladders);
     }
 
-    // --- SETUP PANEL ---
+    // --- Setup Panel Logic ---
 
     private void createSetupPanel() {
         setupPanel = new JPanel(new BorderLayout());
         setupPanel.setBorder(new EmptyBorder(30, 30, 30, 30));
 
+        // Judul Konfigurasi
         titleLabel = new JLabel("<html><div style='text-align: center;'>GAME<br>CONFIGURATION</div></html>", SwingConstants.CENTER);
         titleLabel.setFont(new Font("Verdana", Font.BOLD, 24));
         titleLabel.setBorder(new EmptyBorder(0, 0, 20, 0));
@@ -131,6 +134,7 @@ public class UlarTanggaMain extends JFrame {
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
         formPanel.setOpaque(false);
 
+        // Opsi Konfigurasi (Dropdown)
         Integer[] pOptions = {2, 3, 4};
         playerCountCombo = new JComboBox<>(pOptions);
         addConfigRow(formPanel, "Jumlah Pemain:", playerCountCombo);
@@ -150,22 +154,23 @@ public class UlarTanggaMain extends JFrame {
 
         formPanel.add(Box.createVerticalStrut(20));
 
+        // Area Input Nama (Dinamis)
         namesInputPanel = new JPanel();
         namesInputPanel.setLayout(new BoxLayout(namesInputPanel, BoxLayout.Y_AXIS));
         namesInputPanel.setOpaque(false);
         nameFields = new ArrayList<>();
         updateNameFields(2);
-
         formPanel.add(namesInputPanel);
 
+        // ScrollPane agar form tidak terpotong
         JScrollPane scrollPane = new JScrollPane(formPanel);
         scrollPane.setBorder(null);
         scrollPane.setOpaque(false);
         scrollPane.getViewport().setOpaque(false);
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-
         setupPanel.add(scrollPane, BorderLayout.CENTER);
 
+        // Tombol Mulai
         btnStart = new JButton("START ADVENTURE");
         btnStart.setFont(new Font("Arial", Font.BOLD, 18));
         btnStart.setFocusPainted(false);
@@ -177,9 +182,9 @@ public class UlarTanggaMain extends JFrame {
         btnWrapper.setOpaque(false);
         btnWrapper.setBorder(new EmptyBorder(10, 0, 0, 0));
         btnWrapper.add(btnStart);
-
         setupPanel.add(btnWrapper, BorderLayout.SOUTH);
 
+        // Event Listeners
         playerCountCombo.addActionListener(e -> {
             int count = (int) playerCountCombo.getSelectedItem();
             updateNameFields(count);
@@ -200,7 +205,7 @@ public class UlarTanggaMain extends JFrame {
         updateSetupTheme(ThemeManager.getCurrentTheme());
     }
 
-    // --- GAME PANEL (DASHBOARD) ---
+    // --- Game Panel Logic ---
 
     private void createGamePanel() {
         gamePanel = new JPanel(new BorderLayout(0, 10));
@@ -209,27 +214,23 @@ public class UlarTanggaMain extends JFrame {
         JPanel upperSection = new JPanel(new BorderLayout(10, 0));
         upperSection.setOpaque(false);
 
-        // 1. LEFT CONTROL PANEL (Turn & Dice)
+        // 1. Panel Kiri (Giliran & Dadu)
         leftControlPanel = new JPanel();
         leftControlPanel.setLayout(new BoxLayout(leftControlPanel, BoxLayout.Y_AXIS));
         leftControlPanel.setPreferredSize(new Dimension(140, 0));
         leftControlPanel.setOpaque(false);
 
-        // Turn Info Box
         turnInfoContainer = new JPanel(new BorderLayout());
         turnInfoContainer.setMaximumSize(new Dimension(140, 110));
-        // Style border & color diatur di updateGameTheme nantinya
 
         currentPlayerNameLabel = new JLabel("Player 1", SwingConstants.CENTER);
         currentPlayerNameLabel.setFont(new Font("Arial", Font.BOLD, 13));
         currentPlayerNameLabel.setBorder(new EmptyBorder(5, 0, 5, 0));
 
         currentAvatarPanel = new PlayerAvatarPanel();
-
         turnInfoContainer.add(currentAvatarPanel, BorderLayout.CENTER);
         turnInfoContainer.add(currentPlayerNameLabel, BorderLayout.SOUTH);
 
-        // Dice Visual
         dicePanel = new DicePanel();
         JPanel diceContainer = new JPanel(new FlowLayout(FlowLayout.CENTER));
         diceContainer.setOpaque(false);
@@ -245,34 +246,27 @@ public class UlarTanggaMain extends JFrame {
         leftControlPanel.add(diceContainer);
         leftControlPanel.add(Box.createVerticalGlue());
 
-        // 2. RIGHT INFO PANEL (Rules, Score, Log)
+        // 2. Panel Kanan (Aturan, Skor, Log)
         rightInfoPanel = new JPanel(new BorderLayout(0, 10));
         rightInfoPanel.setOpaque(false);
 
         JPanel topInfoPanel = new JPanel(new BorderLayout(0, 5));
         topInfoPanel.setOpaque(false);
 
-        // Rules Box
-        infoTxt = new JTextArea(
-                "Rules:\n1. Hijau = Maju, Merah = Mundur.\n2. Tangga HANYA JIKA Start = Prima.\n3. BOS: Tertahan sampai dapat dadu 6."
-        );
+        infoTxt = new JTextArea("Rules:\n1. Hijau = Maju, Merah = Mundur.\n2. Tangga HANYA JIKA Start = Prima.\n3. BOS: Tertahan sampai dapat dadu 6.");
         infoTxt.setFont(new Font("SansSerif", Font.PLAIN, 11));
         infoTxt.setEditable(false);
         infoTxt.setLineWrap(true);
         infoTxt.setWrapStyleWord(true);
-        // Border diatur di updateGameTheme
 
-        // Scoreboard
         scoreBoardArea = new JTextArea(6, 20);
         scoreBoardArea.setEditable(false);
         scoreBoardArea.setFont(new Font("Monospaced", Font.BOLD, 12));
         JScrollPane scoreScroll = new JScrollPane(scoreBoardArea);
-        // Border ScrollPane diatur di updateGameTheme
 
         topInfoPanel.add(infoTxt, BorderLayout.NORTH);
         topInfoPanel.add(scoreScroll, BorderLayout.CENTER);
 
-        // Log Area
         logArea = new JTextArea();
         logArea.setEditable(false);
         logArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
@@ -284,21 +278,18 @@ public class UlarTanggaMain extends JFrame {
         upperSection.add(leftControlPanel, BorderLayout.WEST);
         upperSection.add(rightInfoPanel, BorderLayout.CENTER);
 
-        // --- BUTTONS AREA (ROLL & EXIT) ---
-        // Menggunakan GridLayout(2, 1) agar Vertikal (Atas-Bawah) dan lebar penuh
+        // 3. Panel Tombol Bawah (Roll & Exit)
         JPanel bottomButtonPanel = new JPanel(new GridLayout(2, 1, 0, 10));
         bottomButtonPanel.setOpaque(false);
-        bottomButtonPanel.setPreferredSize(new Dimension(0, 120)); // Tinggi cukup untuk 2 tombol
+        bottomButtonPanel.setPreferredSize(new Dimension(0, 120));
 
-        // A. Tombol Roll (Posisi ATAS)
         rollButton = new JButton("ROLL DADU (SPACE)");
         rollButton.setFont(new Font("Arial", Font.BOLD, 16));
         rollButton.setFocusPainted(false);
         rollButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        rollButton.setUI(new javax.swing.plaf.basic.BasicButtonUI()); // Wajib untuk warna background
+        rollButton.setUI(new javax.swing.plaf.basic.BasicButtonUI());
         rollButton.addActionListener(e -> processTurnWithAnimation());
 
-        // B. Tombol Exit (Posisi BAWAH)
         exitGameButton = new JButton("EXIT ADVENTURE");
         exitGameButton.setFont(new Font("Arial", Font.BOLD, 14));
         exitGameButton.setFocusPainted(false);
@@ -319,7 +310,7 @@ public class UlarTanggaMain extends JFrame {
         gamePanel.add(upperSection, BorderLayout.CENTER);
         gamePanel.add(bottomButtonPanel, BorderLayout.SOUTH);
 
-        // --- KEY BINDING (SPACEBAR UNTUK ROLL) ---
+        // --- Key Binding (Spacebar to Roll) ---
         InputMap inputMap = gamePanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap actionMap = gamePanel.getActionMap();
 
@@ -328,13 +319,13 @@ public class UlarTanggaMain extends JFrame {
             @Override
             public void actionPerformed(java.awt.event.ActionEvent e) {
                 if (rollButton.isEnabled()) {
-                    rollButton.doClick(); // Simulasikan klik tombol
+                    rollButton.doClick();
                 }
             }
         });
     }
 
-    // --- STYLING HELPERS ---
+    // --- Styling Helper Methods ---
 
     private void updateSetupTheme(ThemeManager.Theme theme) {
         if (theme == null) return;
@@ -366,44 +357,36 @@ public class UlarTanggaMain extends JFrame {
         setupPanel.repaint();
     }
 
-    // [PERBAIKAN] Update tampilan Dashboard Game dengan Background SOLID
     private void updateGameTheme(ThemeManager.Theme theme) {
         if (theme == null) return;
 
-        // 1. Background Utama Panel Game
         gamePanel.setBackground(theme.tileColor1.darker());
 
         Color accentColor = theme.ladderColor;
         Color btnColor = theme.btnBg;
         Color textColor = Color.WHITE;
 
-        // 2. Styling Turn Info
+        // Update Turn Box
         TitledBorder turnBorder = BorderFactory.createTitledBorder(
                 new LineBorder(accentColor, 2), "Current Turn");
         turnBorder.setTitleColor(accentColor);
         turnBorder.setTitleFont(new Font("Arial", Font.BOLD, 12));
-
         turnInfoContainer.setBorder(turnBorder);
-        turnInfoContainer.setBackground(Color.WHITE); // Solid White
+        turnInfoContainer.setBackground(Color.WHITE);
 
-        // 3. Styling Label
         diceVisualLabel.setForeground(textColor);
 
-        // 4. Styling Text Areas (Rules, Score, Log)
         Color borderColor = theme.btnBg;
-
-        // Warna background solid untuk kotak teks (Putih Gading/Krem sangat muda)
-        // Jangan gunakan Alpha (transparansi) agar tidak glitch
         Color boxBgColor = new Color(250, 250, 250);
 
-        // --- Rules Box ---
+        // Update Rules Box
         infoTxt.setBackground(boxBgColor);
         infoTxt.setForeground(Color.BLACK);
-        infoTxt.setOpaque(true); // Wajib True agar warna solid tergambar
+        infoTxt.setOpaque(true);
         infoTxt.setBorder(BorderFactory.createCompoundBorder(
                 new LineBorder(borderColor, 2), new EmptyBorder(5, 5, 5, 5)));
 
-        // --- Scoreboard ---
+        // Update Scoreboard
         JScrollPane scoreScroll = (JScrollPane) scoreBoardArea.getParent().getParent();
         if (scoreScroll != null) {
             TitledBorder sbBorder = BorderFactory.createTitledBorder(
@@ -411,14 +394,13 @@ public class UlarTanggaMain extends JFrame {
             sbBorder.setTitleColor(textColor);
             sbBorder.setTitleFont(new Font("Arial", Font.BOLD, 12));
             scoreScroll.setBorder(sbBorder);
-            // ScrollPane biarkan transparan, tapi kontennya (TextArea) dibuat solid
             scoreScroll.setOpaque(false);
             scoreScroll.getViewport().setOpaque(false);
         }
-        scoreBoardArea.setBackground(boxBgColor); // Solid
-        scoreBoardArea.setOpaque(true);           // Solid (Mengatasi glitch background)
+        scoreBoardArea.setBackground(boxBgColor);
+        scoreBoardArea.setOpaque(true);
 
-        // --- Log Area ---
+        // Update Log
         JScrollPane logScroll = (JScrollPane) logArea.getParent().getParent();
         if (logScroll != null) {
             TitledBorder logBorder = BorderFactory.createTitledBorder(
@@ -429,19 +411,18 @@ public class UlarTanggaMain extends JFrame {
             logScroll.setOpaque(false);
             logScroll.getViewport().setOpaque(false);
         }
-        logArea.setBackground(boxBgColor); // Solid
-        logArea.setOpaque(true);           // Solid (Mengatasi glitch background)
+        logArea.setBackground(boxBgColor);
+        logArea.setOpaque(true);
 
-        // 5. Styling Roll Button
-        Color rollTextCol = getContrastColor(btnColor);
+        // Update Buttons
+        Color btnTextCol = getContrastColor(btnColor);
         rollButton.setBackground(btnColor);
-        rollButton.setForeground(rollTextCol);
+        rollButton.setForeground(btnTextCol);
         rollButton.setOpaque(true);
         rollButton.setBorder(BorderFactory.createCompoundBorder(
                 new LineBorder(accentColor, 3, true), new EmptyBorder(5, 0, 5, 0)
         ));
 
-        // 6. Styling Tombol Exit
         exitGameButton.setBackground(btnColor.darker());
         exitGameButton.setForeground(Color.WHITE);
         exitGameButton.setOpaque(true);
@@ -449,7 +430,6 @@ public class UlarTanggaMain extends JFrame {
                 new LineBorder(Color.WHITE, 2, true), new EmptyBorder(5, 0, 5, 0)
         ));
 
-        // Paksa repaint ulang agar artefak visual hilang
         gamePanel.revalidate();
         gamePanel.repaint();
     }
@@ -519,13 +499,13 @@ public class UlarTanggaMain extends JFrame {
         return luminance < 0.5 ? Color.WHITE : Color.BLACK;
     }
 
-    // --- GAME LOGIC ---
+    // --- GAMEPLAY LOGIC START ---
 
     private void startGame() {
         ThemeManager.Theme selectedTheme = (ThemeManager.Theme) themeCombo.getSelectedItem();
         ThemeManager.setTheme(selectedTheme);
 
-        updateGameTheme(selectedTheme);
+        updateGameTheme(selectedTheme); // Apply tema ke dashboard game
 
         int selectedLadderCount = (int) ladderCountCombo.getSelectedItem();
         initRandomLadders(selectedLadderCount);
@@ -534,20 +514,21 @@ public class UlarTanggaMain extends JFrame {
         boardPanel.generateBossTiles(selectedBossCount);
 
         boardPanel.generateNewTilePoints();
-        boardPanel.applyTheme();
+        boardPanel.applyTheme(); // Redraw board
 
         playerQueue = new LinkedList<>();
         fixedPlayerList = new ArrayList<>();
 
         Color[] colors = {Color.RED, Color.BLUE, Color.GREEN, Color.ORANGE};
 
+        // Buat objek player dari input
         int count = nameFields.size();
         for (int i = 0; i < count; i++) {
             String name = nameFields.get(i).getText().trim();
             if (name.isEmpty()) name = "Player " + (i + 1);
 
             Player newPlayer = new Player(name, colors[i]);
-            // Restore score if playing again
+            // Restore score jika main lagi
             if (globalScoreMap.containsKey(name)) {
                 newPlayer.setScore(globalScoreMap.get(name));
             }
@@ -589,13 +570,17 @@ public class UlarTanggaMain extends JFrame {
         scoreBoardArea.setText(sb.toString());
     }
 
+    // --- Turn & Animation Logic ---
+
     private void processTurnWithAnimation() {
         rollButton.setEnabled(false);
-        exitGameButton.setEnabled(false); // Disable exit saat roll
+        exitGameButton.setEnabled(false);
         try { SoundUtility.playSound("dice_roll.wav"); } catch (Exception ex) {}
 
         Player currentPlayer = playerQueue.peek();
         int realDiceVal = random.nextInt(6) + 1;
+
+        // Logika Merah/Hijau (70% Hijau/Maju, 30% Merah/Mundur)
         double chance = random.nextDouble();
         boolean isGreen = chance < 0.7;
 
@@ -603,6 +588,7 @@ public class UlarTanggaMain extends JFrame {
             logArea.append(">> " + currentPlayer.getName() + " TERTAHAN BOS! Butuh angka 6.\n");
         }
 
+        // Animasi angka dadu acak sebelum berhenti
         final int totalAnimationSteps = 15;
         javax.swing.Timer diceTimer = new javax.swing.Timer(80, null);
         diceTimer.addActionListener(new java.awt.event.ActionListener() {
@@ -616,6 +602,8 @@ public class UlarTanggaMain extends JFrame {
                 if (step >= totalAnimationSteps) {
                     diceTimer.stop();
                     dicePanel.setNumber(realDiceVal);
+
+                    // Set warna dadu final
                     if (isGreen) {
                         dicePanel.setDiceColor(new Color(144, 238, 144));
                         try { SoundUtility.playSound("move_green.wav"); } catch(Exception ex){}
@@ -630,6 +618,7 @@ public class UlarTanggaMain extends JFrame {
         diceTimer.start();
     }
 
+    // Cek Bilangan Prima (Untuk Syarat Tangga)
     private boolean isPrime(int n) {
         if (n <= 1) return false;
         if (n == 2 || n == 3) return true;
@@ -644,6 +633,7 @@ public class UlarTanggaMain extends JFrame {
         Player currentPlayer = playerQueue.poll();
         int startPos = currentPlayer.getPosition();
 
+        // 1. Logika Boss Trap (Tertahan)
         if (currentPlayer.isTrapped()) {
             logArea.append(String.format("   Status: Trapped di Tile %d. Dadu: %d\n", startPos, diceVal));
             if (diceVal == 6) {
@@ -667,9 +657,11 @@ public class UlarTanggaMain extends JFrame {
         List<Integer> movementPath = new ArrayList<>();
 
         if (isGreen) {
+            // Logika Maju
             int ladderIntersection = -1;
             int stepsToIntersection = 0;
 
+            // Cek apakah start prima untuk syarat tangga
             if (startIsPrime) {
                 for (int i = 1; i <= diceVal; i++) {
                     int checkPos = startPos + i;
@@ -683,13 +675,14 @@ public class UlarTanggaMain extends JFrame {
             }
 
             if (ladderIntersection != -1) {
+                // Ada tangga & start prima
                 int ladderTop = ladders.get(ladderIntersection);
                 int remainingSteps = diceVal - stepsToIntersection;
                 logArea.append(String.format("   [PRIME EFFECT] Start Prima (%d) -> Injak Tangga di %d -> AUTO NAIK ke %d\n",
                         startPos, ladderIntersection, ladderTop));
 
                 movementPath.addAll(pathFinder.findShortestPath(startPos, ladderIntersection));
-                movementPath.add(ladderTop);
+                movementPath.add(ladderTop); // Naik tangga visual
 
                 if (remainingSteps > 0) {
                     logArea.append(String.format("   [PRIME EFFECT] Lanjut sisa %d langkah dari %d\n", remainingSteps, ladderTop));
@@ -703,6 +696,7 @@ public class UlarTanggaMain extends JFrame {
                     targetPos = ladderTop;
                 }
             } else {
+                // Gerakan Normal Maju
                 targetPos = startPos + diceVal;
                 if (targetPos > 64) targetPos = 64;
                 movementPath = pathFinder.findShortestPath(startPos, targetPos);
@@ -711,6 +705,7 @@ public class UlarTanggaMain extends JFrame {
                 }
             }
         } else {
+            // Logika Mundur (Kembali ke posisi sebelumnya)
             targetPos = currentPlayer.getPreviousPosition();
             if (targetPos == startPos) {
                 logArea.append("   (Masih di Start, tidak bisa mundur)\n");
@@ -724,12 +719,13 @@ public class UlarTanggaMain extends JFrame {
         final int finalDestinationCalc = targetPos;
         final List<Integer> animPath = movementPath;
 
+        // Eksekusi Animasi di Background
         SwingWorker<Void, Integer> worker = new SwingWorker<>() {
             @Override
             protected Void doInBackground() throws Exception {
                 for (int pos : animPath) {
                     if (pos != startPos) {
-                        Thread.sleep(300);
+                        Thread.sleep(300); // Speed animasi
                         try { SoundUtility.playSound("step.wav"); } catch(Exception ex){}
                     }
                     publish(pos);
@@ -746,6 +742,7 @@ public class UlarTanggaMain extends JFrame {
 
             @Override
             protected void done() {
+                // Cek apakah mendarat di Boss
                 if (boardPanel.isBossTile(finalDestinationCalc)) {
                     logArea.append("   [DANGER] Mendarat di Tile BOS (" + finalDestinationCalc + ")!\n");
                     logArea.append("   Anda TERTAHAN sampai mendapat dadu 6.\n");
@@ -790,6 +787,7 @@ public class UlarTanggaMain extends JFrame {
         boardPanel.updatePlayerPawns(getAllPlayersIncluding(player));
         updateScoreBoard();
 
+        // Cek Menang
         if (player.getPosition() == 64) {
             player.addScore(FINISH_BONUS);
             logArea.append("FINISH! Bonus +" + FINISH_BONUS + "\n");
@@ -801,6 +799,7 @@ public class UlarTanggaMain extends JFrame {
             return;
         }
 
+        // Cek Extra Turn (Kelipatan 5)
         if (player.getPosition() % 5 == 0 && !player.isTrapped()) {
             logArea.append("   [EXTRA TURN] Kelipatan 5!\n");
             JOptionPane.showMessageDialog(this, player.getName() + " dapat EXTRA TURN!");
@@ -817,7 +816,6 @@ public class UlarTanggaMain extends JFrame {
     }
 
     private void showWinnerDialog() {
-        // Simpan skor ke Global Map sebelum dialog agar "Pilih Map Baru" membawa skor update
         for (Player p : fixedPlayerList) {
             globalScoreMap.put(p.getName(), p.getScore());
         }
@@ -843,9 +841,9 @@ public class UlarTanggaMain extends JFrame {
                 "Winner: " + winnerName,
                 JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
 
-        if (choice == 0) { // Main Lagi (Reset board dengan setting sama)
+        if (choice == 0) {
             startGame();
-        } else if (choice == 1) { // Pilih Map Baru (Kembali ke Setup dengan skor tersimpan)
+        } else if (choice == 1) {
             cardLayout.show(rightPanelContainer, "SETUP");
             logArea.setText("");
         } else {
@@ -863,13 +861,16 @@ public class UlarTanggaMain extends JFrame {
         SwingUtilities.invokeLater(() -> new UlarTanggaMain());
     }
 
+    // --- Inner Class: Algoritma Dijkstra ---
     class DijkstraPathFinder {
         public List<Integer> findShortestPath(int startNode, int endNode) {
             if (startNode == endNode) return Collections.singletonList(startNode);
+
             PriorityQueue<NodeDistance> pq = new PriorityQueue<>(Comparator.comparingInt(n -> n.distance));
             Map<Integer, Integer> distances = new HashMap<>();
             Map<Integer, Integer> previous = new HashMap<>();
             Set<Integer> visited = new HashSet<>();
+
             for (int i = 1; i <= 64; i++) distances.put(i, Integer.MAX_VALUE);
             distances.put(startNode, 0);
             pq.add(new NodeDistance(startNode, 0));
@@ -880,6 +881,7 @@ public class UlarTanggaMain extends JFrame {
                 if (visited.contains(u)) continue;
                 visited.add(u);
                 if (u == endNode) break;
+
                 List<Integer> neighbors = getNeighbors(u);
                 for (int v : neighbors) {
                     if (!visited.contains(v)) {

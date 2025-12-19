@@ -5,21 +5,24 @@ public class Player {
     private String name;
     private int position;
     private Color color;
-    private int score; // Fitur Score
+    private int score;
+
+    // Stack untuk menyimpan riwayat posisi (untuk fitur mundur)
     private Stack<Integer> stepHistory;
 
-    private boolean isTrappedByBoss = false; // Status tertahan bos
+    // Status khusus jika pemain tertangkap oleh Boss
+    private boolean isTrappedByBoss = false;
 
     public Player(String name, Color color) {
         this.name = name;
         this.color = color;
-        this.position = 1;
-        this.score = 0; // Score awal 0
+        this.position = 1; // Mulai dari tile 1
+        this.score = 0;
         this.stepHistory = new Stack<>();
         this.stepHistory.push(1);
     }
 
-    // [BARU] Getter Setter untuk status Boss Trap
+    // --- Boss Trap Logic ---
     public boolean isTrapped() {
         return isTrappedByBoss;
     }
@@ -28,19 +31,16 @@ public class Player {
         this.isTrappedByBoss = trapped;
     }
 
+    // --- Basic Getters ---
     public String getName() {
         return name;
-    }
-
-    public int getPosition() {
-        return position;
     }
 
     public Color getColor() {
         return color;
     }
 
-    // --- SCORE METHODS ---
+    // --- Score Management ---
     public int getScore() {
         return score;
     }
@@ -49,46 +49,43 @@ public class Player {
         this.score += points;
     }
 
-    // [BARU] Setter manual untuk memuat skor dari sesi sebelumnya
     public void setScore(int score) {
         this.score = score;
     }
-    // ---------------------
 
-    public Stack<Integer> getHistory() {
-        return stepHistory;
+    // --- Movement & History Logic ---
+    public int getPosition() {
+        return position;
     }
 
+    // Update posisi dan simpan ke history
     public void setPosition(int newPosition) {
         this.position = newPosition;
         this.stepHistory.push(newPosition);
     }
 
+    // Set posisi tanpa update history (jarang dipakai, untuk force set)
     public void setPositionRaw(int newPosition) {
         this.position = newPosition;
     }
 
-    // Mengintip posisi sebelumnya tanpa mengubah Stack (Untuk Logic Penentuan Target)
+    // Mengintip posisi sebelum langkah terakhir (tanpa menghapus data)
     public int getPreviousPosition() {
-        // Size > 1 artinya minimal ada [PosisiAwal, PosisiSekarang]
         if (stepHistory.size() > 1) {
-            // Ambil elemen kedua dari atas (size - 2)
             return stepHistory.get(stepHistory.size() - 2);
         }
-        // Jika baru mulai (cuma ada 1 data), tetap di posisi sekarang
         return position;
     }
 
-    // Eksekusi Mundur: Hapus posisi terakhir dari Stack (Untuk Logic Finish Turn)
+    // Mundur: Menghapus langkah terakhir (Undo)
     public void revertToPreviousStep() {
         if (stepHistory.size() > 1) {
-            stepHistory.pop(); // Hapus posisi saat ini (Undo)
-            this.position = stepHistory.peek(); // Set posisi ke data history sebelumnya
+            stepHistory.pop(); // Buang posisi sekarang
+            this.position = stepHistory.peek(); // Kembali ke posisi sebelumnya
         }
     }
 
-    // --- [BARU] FITUR RESET SESSION ---
-    // Mengembalikan player ke posisi awal tapi TIDAK menghapus skor (Akumulasi)
+    // Reset untuk sesi baru (tetap simpan nama/warna, reset posisi)
     public void resetForNewSession() {
         this.position = 1;
         this.stepHistory.clear();
